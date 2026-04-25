@@ -3,6 +3,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 
+const { loginLimiter } = require('../middleware/rateLimiters');
+
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 const ALLOWED_EMAIL_DOMAIN = '@pau.edu.tr';
@@ -64,7 +66,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
 

@@ -8,6 +8,10 @@ router.post('/', (req, res) => {
   const { user_id, room_id, status, notes, image } = req.body;
   const userId = user_id || req.user.id; // body'den gelebilir, yoksa token kullan
 
+  if (image && Buffer.byteLength(image, 'base64') > 1.5 * 1024 * 1024) {
+    return res.status(413).json({ message: 'Fotoğraf çok büyük (max 1MB)' });
+  }
+
   if (!userId || !room_id || !status) {
     return res
       .status(400)

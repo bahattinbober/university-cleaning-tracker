@@ -10,6 +10,7 @@ const cleaningRoutes = require('./routes/cleaning');
 const adminRoutes = require('./routes/admin');
 const tasksRoutes = require('./routes/tasks');
 const authMiddleware = require('./middleware/authMiddleware');
+const { generalLimiter } = require('./middleware/rateLimiters');
 
 if (!process.env.JWT_SECRET) {
   console.error('❌ JWT_SECRET env değişkeni eksik. Sunucu başlatılamıyor.');
@@ -28,7 +29,8 @@ app.use(cors({
     callback(new Error(`CORS: '${origin}' origin'ine izin verilmiyor`));
   },
 }));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+app.use('/api', generalLimiter);
 
 // Health check
 app.get('/api/health', (req, res) => {
