@@ -1,0 +1,18 @@
+# Environment variables - NEVER commit
+backend/backend/.env
+
+# Dependencies
+backend/backend/node_modules/
+
+# SQLite database (contains real data)
+backend/backend/temizlik_sistemi.sqlite
+
+# OS & editor artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Cursor IDE settings
+.cursor/

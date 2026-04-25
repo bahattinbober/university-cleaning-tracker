@@ -1,0 +1,242 @@
+const express = require('express');
+const db = require('../db');
+
+const router = express.Router();
+
+function ensureAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Yetkiniz yok (admin değil)' });
+  }
+  next();
+}
+
+// GET /api/admin/pending-users -> onay bekleyen kullanıcılar
+router.get('/pending-users', ensureAdmin, (req, res) => {
+  const sql = `
+    SELECT id, name, email, employee_no, department, role, approval_status
+    FROM users
+    WHERE approval_status = 'pending'
+    ORDER BY id DESC
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Sunucu hatası' });
+    }
+    return res.json(rows);
+  });
+});
+
+// PUT /api/admin/approve-user/:id -> kullanıcı onayla
+router.put('/approve-user/:id', ensureAdmin, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!userId) {
+    return res.status(400).json({ message: 'Geçersiz kullanıcı id' });
+  }
+
+  db.run(
+    `UPDATE users SET approval_status = 'approved' WHERE id = ?`,
+    [userId],
+    function (err) {
+      if (err) return res.status(500).json({ message: 'Sunucu hatası' });
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+      }
+      return res.json({ message: 'Kullanıcı onaylandı' });
+    }
+  );
+});
+
+// PUT /api/admin/reject-user/:id -> kullanıcı reddet
+router.put('/reject-user/:id', ensureAdmin, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!userId) {
+    return res.status(400).json({ message: 'Geçersiz kullanıcı id' });
+  }
+
+  db.run(
+    `UPDATE users SET approval_status = 'rejected' WHERE id = ?`,
+    [userId],
+    function (err) {
+      if (err) return res.status(500).json({ message: 'Sunucu hatası' });
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+      }
+      return res.json({ message: 'Kullanıcı reddedildi' });
+    }
+  );
+});
+
+// POST /api/admin/scheduled-tasks -> planlı görev oluştur
+router.post('/scheduled-tasks', ensureAdmin, (req, res) => {
+  const { room_id, title, description, scheduled_for, assigned_user_id } = req.body;
+
+  if (!room_id || !title || !scheduled_for) {
+    return res.status(400).json({ message: 'room_id, title ve scheduled_for zorunlu' });
+  }
+
+  db.run(
+    `INSERT INTO scheduled_tasks (room_id, title, description, scheduled_for, assigned_user_id, status)
+     VALUES (?, ?, ?, ?, ?, 'pending')`,
+    [
+      room_id,
+      String(title).trim(),
+      description ? String(description).trim() : null,
+      scheduled_for,
+      assigned_user_id || null,
+    ],
+    function (err) {
+      if (err) return res.status(500).json({ message: 'Sunucu hatası' });
+      return res.status(201).json({
+        id: this.lastID,
+        room_id,
+        title: String(title).trim(),
+        description: description ? String(description).trim() : null,
+        scheduled_for,
+        assigned_user_id: assigned_user_id || null,
+        status: 'pending',
+      });
+    }
+  );
+});
+
+// GET /api/admin/scheduled-tasks -> planlı görevleri listele
+router.get('/scheduled-tasks', ensureAdmin, (req, res) => {
+  const sql = `
+    SELECT
+      st.id,
+      st.room_id,
+      st.title,
+      st.description,
+      st.scheduled_for,
+      st.assigned_user_id,
+      st.status,
+      st.completed_log_id,
+      st.created_at,
+      r.name AS room_name,
+      u.name AS assigned_user_name
+    FROM scheduled_tasks st
+    LEFT JOIN rooms r ON r.id = st.room_id
+    LEFT JOIN users u ON u.id = st.assigned_user_id
+    ORDER BY datetime(st.scheduled_for) ASC
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ message: 'Sunucu hatası' });
+    return res.json(rows);
+  });
+});
+
+// GET /api/admin/weekly-kpi -> son 7 güne göre çalışan karşılaştırması
+router.get('/weekly-kpi', ensureAdmin, (req, res) => {
+  // Skor formülü merkezi olarak burada hesaplanır:
+  // score = (total_tasks * 5) + (completed_tasks * 3) + (noted_tasks * 1) + (photo_tasks * 2) + (on_time_tasks * 4) - (late_tasks * 2)
+  const sql = `
+    SELECT
+      u.id AS user_id,
+      u.name,
+      u.email,
+      COUNT(cl.id) AS total_tasks,
+      SUM(CASE WHEN cl.status = 'completed' THEN 1 ELSE 0 END) AS completed_tasks,
+      SUM(
+        CASE
+          WHEN cl.notes IS NOT NULL AND TRIM(cl.notes) <> '' THEN 1
+          ELSE 0
+        END
+      ) AS noted_tasks,
+      SUM(
+        CASE
+          WHEN cl.image IS NOT NULL AND TRIM(cl.image) <> '' THEN 1
+          ELSE 0
+        END
+      ) AS photo_tasks,
+      SUM(
+        CASE
+          WHEN st.id IS NOT NULL
+               AND datetime(cl.cleaned_at) <= datetime(st.scheduled_for) THEN 1
+          ELSE 0
+        END
+      ) AS on_time_tasks,
+      SUM(
+        CASE
+          WHEN st.id IS NOT NULL
+               AND datetime(cl.cleaned_at) > datetime(st.scheduled_for) THEN 1
+          ELSE 0
+        END
+      ) AS late_tasks
+    FROM cleaning_logs cl
+    INNER JOIN users u ON u.id = cl.user_id
+    LEFT JOIN scheduled_tasks st ON st.completed_log_id = cl.id
+    WHERE datetime(cl.cleaned_at) >= datetime('now', '-7 day')
+    GROUP BY u.id, u.name, u.email
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Sunucu hatası' });
+    }
+
+    const result = rows
+      .map((row) => {
+        const totalTasks = Number(row.total_tasks || 0);
+        const completedTasks = Number(row.completed_tasks || 0);
+        const notedTasks = Number(row.noted_tasks || 0);
+        const photoTasks = Number(row.photo_tasks || 0);
+        const onTimeTasks = Number(row.on_time_tasks || 0);
+        const lateTasks = Number(row.late_tasks || 0);
+
+        return {
+          user_id: row.user_id,
+          name: row.name,
+          email: row.email,
+          total_tasks: totalTasks,
+          completed_tasks: completedTasks,
+          noted_tasks: notedTasks,
+          photo_tasks: photoTasks,
+          on_time_tasks: onTimeTasks,
+          late_tasks: lateTasks,
+          score:
+            totalTasks * 5 +
+            completedTasks * 3 +
+            notedTasks * 1 +
+            photoTasks * 2 +
+            onTimeTasks * 4 -
+            lateTasks * 2,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    return res.json(result);
+  });
+});
+
+// GET /api/admin/user-logs/:userId -> admin, seçili kullanıcının temizlik kayıtları
+router.get('/user-logs/:userId', ensureAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!userId) {
+    return res.status(400).json({ message: 'Geçersiz kullanıcı id' });
+  }
+
+  const sql = `
+    SELECT
+      cl.id,
+      cl.room_id,
+      r.name AS room_name,
+      cl.cleaned_at,
+      cl.notes,
+      cl.image
+    FROM cleaning_logs cl
+    LEFT JOIN rooms r ON r.id = cl.room_id
+    WHERE cl.user_id = ?
+    ORDER BY datetime(cl.cleaned_at) DESC
+  `;
+
+  db.all(sql, [userId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Sunucu hatası' });
+    }
+    return res.json({ logs: rows });
+  });
+});
+
+module.exports = router;
