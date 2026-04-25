@@ -28,7 +28,16 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Ana Sayfa")),
+      appBar: AppBar(
+        title: const Text("Ana Sayfa"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.lock_outline),
+            tooltip: 'Şifre Değiştir',
+            onPressed: () => Navigator.pushNamed(context, '/change-password'),
+          ),
+        ],
+      ),
       body: FutureBuilder(
         future: Future.wait([_getUserName(), _getUserRole()]),
         builder: (context, snapshot) {
@@ -153,6 +162,17 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                   ],
+
+                  // Şifre değiştir
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/change-password'),
+                      child: const Text('Şifre Değiştir'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
 
                   // Çıkış
                   SizedBox(

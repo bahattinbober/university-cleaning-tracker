@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 
 const { loginLimiter } = require('../middleware/rateLimiters');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -103,6 +104,40 @@ router.post('/login', loginLimiter, (req, res) => {
         role: user.role
       }
     });
+  });
+});
+
+// PUT /api/auth/change-password
+router.put('/change-password', authMiddleware, (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ message: 'Eski ve yeni şifre zorunludur' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'Yeni şifre en az 8 karakter olmalı' });
+  }
+  if (oldPassword === newPassword) {
+    return res.status(400).json({ message: 'Yeni şifre eskisinden farklı olmalı' });
+  }
+
+  db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id], async (err, user) => {
+    if (err) return res.status(500).json({ message: 'Sunucu hatası' });
+    if (!user) return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+
+    const match = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!match) return res.status(401).json({ message: 'Eski şifre yanlış' });
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+
+    db.run(
+      `UPDATE users SET password_hash = ? WHERE id = ?`,
+      [newHash, req.user.id],
+      function (updateErr) {
+        if (updateErr) return res.status(500).json({ message: 'Sunucu hatası' });
+        res.json({ message: 'Şifre başarıyla değiştirildi' });
+      }
+    );
   });
 });
 
