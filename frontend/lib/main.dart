@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/rooms_screen.dart';
@@ -42,7 +43,7 @@ class MyApp extends StatelessWidget {
         "/change-password": (context) => const ChangePasswordScreen(),
       },
 
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+      theme: AppTheme.lightTheme,
     );
   }
 }
