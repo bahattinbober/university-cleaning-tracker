@@ -2,6 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/info_chip.dart';
+import '../utils/translations.dart';
 
 class AdminAllUsersScreen extends StatefulWidget {
   const AdminAllUsersScreen({super.key});
@@ -22,68 +26,81 @@ class _AdminAllUsersScreenState extends State<AdminAllUsersScreen> {
   }
 
   Future<void> _fetchUsers() async {
+    setState(() { isLoading = true; errorMessage = null; });
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token'); // şu an backend bu tokeni kontrol etmiyor ama ileride ekleriz
+      final token = prefs.getString('token');
 
-      // Token boşa gitmesin, header'a koyuyoruz
-      final url = Uri.parse('http://10.0.2.2:4000/api/users');
       final response = await http.get(
-        url,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        Uri.parse('http://10.0.2.2:4000/api/users'),
+        headers: { if (token != null) 'Authorization': 'Bearer $token' },
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          users = data as List;
-          isLoading = false;
-        });
+        setState(() { users = jsonDecode(response.body) as List; isLoading = false; });
       } else {
-        setState(() {
-          errorMessage =
-              'Kullanıcı listesi alınamadı (kod: ${response.statusCode}).';
-          isLoading = false;
-        });
+        setState(() { errorMessage = 'Kullanıcı listesi alınamadı (kod: ${response.statusCode}).'; isLoading = false; });
       }
     } catch (e) {
-      setState(() {
-        errorMessage = 'Bir hata oluştu: $e';
-        isLoading = false;
-      });
+      setState(() { errorMessage = 'Bir hata oluştu: $e'; isLoading = false; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tüm Kullanıcılar (Admin)')),
+      appBar: AppBar(title: const Text('Tüm Kullanıcılar')),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null
               ? Center(child: Text(errorMessage!))
               : users.isEmpty
-                  ? const Center(child: Text('Hiç kullanıcı bulunamadı.'))
-                  : ListView.builder(
-                      itemCount: users.length,
-                      itemBuilder: (context, index) {
-                        final user = users[index];
-                        final id = user['id'] ?? '-';
-                        final name = user['name'] ?? 'İsimsiz';
-                        final email = user['email'] ?? '';
-                        final role = user['role'] ?? '';
+                  ? const EmptyState(
+                      icon: Icons.people_outline,
+                      title: 'Kullanıcı Bulunamadı',
+                      message: 'Sistemde kayıtlı kullanıcı bulunmuyor.',
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _fetchUsers,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                        itemCount: users.length,
+                        itemBuilder: (context, index) {
+                          final user = users[index];
+                          final name = user['name'] ?? 'İsimsiz';
+                          final email = user['email'] ?? '';
+                          final role = user['role']?.toString();
+                          final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+                          final isAdmin = role == 'admin';
 
-                        return ListTile(
-                          leading: CircleAvatar(
-                            child: Text('$id'),
-                          ),
-                          title: Text(name),
-                          subtitle: Text('$email\nRol: $role'),
-                          isThreeLine: true,
-                        );
-                      },
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: isAdmin
+                                    ? AppColors.adminAccent.withValues(alpha: 0.15)
+                                    : AppColors.staffAccent.withValues(alpha: 0.15),
+                                child: Text(
+                                  initial,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isAdmin ? AppColors.adminAccent : AppColors.staffAccent,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                name,
+                                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(email, style: AppTextStyles.caption),
+                              trailing: InfoChip(
+                                label: StatusTranslator.userRole(role),
+                                color: isAdmin ? AppColors.adminAccent : AppColors.staffAccent,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
     );
   }
