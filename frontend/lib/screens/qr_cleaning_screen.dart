@@ -1,11 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
+import '../utils/translations.dart';
+
+// ---------------------------------------------------------------------------
+// QR Tarayıcı Ekranı
+// ---------------------------------------------------------------------------
 
 class QRCleaningScreen extends StatefulWidget {
   const QRCleaningScreen({super.key});
@@ -50,7 +56,9 @@ class _QRCleaningScreenState extends State<QRCleaningScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => CleaningLogFormScreen(roomId: roomId!)),
+      MaterialPageRoute(
+        builder: (_) => CleaningLogFormScreen(roomId: roomId!),
+      ),
     );
 
     if (!mounted) return;
@@ -78,35 +86,77 @@ class _QRCleaningScreenState extends State<QRCleaningScreen> {
           Expanded(
             flex: 2,
             child: Container(
-              padding: const EdgeInsets.all(16),
-              width: double.infinity,
-              color: Colors.grey[100],
+              color: AppColors.background,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (isProcessing)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    const Text(
-                      'Bir oda QR kodunu kameraya gösterin.\nQR içeriği oda ID olmalı (örnek: 1, 2, 3 ...)',
+                  Container(
+                    margin: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                      ),
                     ),
-                  const SizedBox(height: 12),
+                    child: isProcessing
+                        ? const Center(child: CircularProgressIndicator())
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline,
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  const Expanded(
+                                    child: Text(
+                                      'Bir oda QR kodunu kameraya gösterin.',
+                                      style: AppTextStyles.body,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              const Text(
+                                'QR içeriği oda ID olmalı (örnek: 1, 2, 3 ...)',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                  ),
                   if (lastMessage != null)
-                    Text(
-                      lastMessage!,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                      ),
+                      child: Text(
+                        lastMessage!,
+                        style: AppTextStyles.caption,
+                      ),
                     ),
                   const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    // Geçici test butonu: QR okutulmuş gibi room_id=1 ile akışı tetikler.
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await _handleCode('1');
-                      },
-                      child: const Text('Test için Oda 1 kaydı oluştur'),
+                  if (kDebugMode)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md, 0, AppSpacing.md, AppSpacing.md,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => _handleCode('1'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          ),
+                          child: const Text('DEBUG: Manual Test'),
+                        ),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -116,6 +166,10 @@ class _QRCleaningScreenState extends State<QRCleaningScreen> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Temizlik Kaydı Formu
+// ---------------------------------------------------------------------------
 
 class CleaningLogFormScreen extends StatefulWidget {
   const CleaningLogFormScreen({super.key, required this.roomId});
@@ -137,6 +191,9 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
   int? userId;
   String? token;
   File? pickedImage;
+
+  // Backend sadece 'completed' kabul eder; seçim KPI gösterimi için UI mock.
+  String _selectedStatus = 'completed';
 
   @override
   void initState() {
@@ -173,9 +230,8 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
     }
 
     try {
-      final url = Uri.parse('http://10.0.2.2:4000/api/rooms');
       final response = await http.get(
-        url,
+        Uri.parse('http://10.0.2.2:4000/api/rooms'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -185,7 +241,6 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
           (room) => room['id'] == widget.roomId,
           orElse: () => <String, dynamic>{},
         );
-
         setState(() {
           roomName = (found['name'] as String?) ?? 'Oda #${widget.roomId}';
           isLoadingRoomName = false;
@@ -210,10 +265,7 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
       imageQuality: 60,
     );
     if (image == null) return;
-
-    setState(() {
-      pickedImage = File(image.path);
-    });
+    setState(() => pickedImage = File(image.path));
   }
 
   Future<String?> _imageToBase64() async {
@@ -234,12 +286,12 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
     }
 
     setState(() => isSubmitting = true);
+    final statusLabel = StatusTranslator.cleaningStatus(_selectedStatus);
 
     try {
       final imageBase64 = await _imageToBase64();
-      final url = Uri.parse('http://10.0.2.2:4000/api/cleaning-logs');
       final response = await http.post(
-        url,
+        Uri.parse('http://10.0.2.2:4000/api/cleaning-logs'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -247,7 +299,7 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
         body: jsonEncode({
           'user_id': userId,
           'room_id': widget.roomId,
-          'status': 'completed',
+          'status': 'completed', // Backend sadece 'completed' kabul eder
           'notes': notesController.text.trim(),
           'image': imageBase64,
         }),
@@ -257,88 +309,159 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
 
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Temizlik kaydı başarıyla eklendi.')),
+          SnackBar(
+            content: Text(
+              'Temizlik kaydı başarıyla eklendi ($statusLabel).',
+            ),
+          ),
         );
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       } else {
-        String message = 'Kayıt oluşturulamadı (Kod: ${response.statusCode})';
+        String message =
+            'Kayıt oluşturulamadı (Kod: ${response.statusCode})';
         try {
           final body = jsonDecode(response.body);
           if (body is Map<String, dynamic> && body['message'] != null) {
             message = body['message'] as String;
           }
         } catch (_) {}
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Bir hata oluştu: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Bir hata oluştu: $e')),
+      );
     } finally {
-      if (mounted) {
-        setState(() => isSubmitting = false);
-      }
+      if (mounted) setState(() => isSubmitting = false);
     }
+  }
+
+  Widget _infoCard(
+    IconData icon,
+    Color color,
+    String label,
+    String value,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              '$label: $value',
+              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(String value, String label, IconData icon) {
+    final selected = _selectedStatus == value;
+    return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: selected ? Colors.white : AppColors.textSecondary,
+      ),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: selected ? Colors.white : AppColors.textSecondary,
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
+      ),
+      selected: selected,
+      selectedColor: AppColors.primary,
+      backgroundColor: AppColors.surface,
+      side: BorderSide(
+        color: selected ? AppColors.primary : const Color(0xFFE5E7EB),
+      ),
+      onSelected: (_) => setState(() => _selectedStatus = value),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Temizlik Kaydı')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              readOnly: true,
-              decoration: InputDecoration(
-                labelText: 'Oda Adı',
-                border: const OutlineInputBorder(),
-                hintText: isLoadingRoomName ? 'Yükleniyor...' : roomName,
-              ),
-              controller: TextEditingController(
-                text: isLoadingRoomName ? '' : roomName,
-              ),
+            _infoCard(
+              Icons.meeting_room,
+              AppColors.staffAccent,
+              'Oda',
+              isLoadingRoomName ? 'Yükleniyor...' : roomName,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Kullanıcı Adı',
-                border: OutlineInputBorder(),
-              ),
-              controller: TextEditingController(text: userName),
+            const SizedBox(height: AppSpacing.md),
+            _infoCard(
+              Icons.person,
+              AppColors.primary,
+              'Personel',
+              userName.isEmpty ? 'Yükleniyor...' : userName,
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _pickPhoto,
-              icon: const Icon(Icons.photo_camera_outlined),
-              label: Text(
-                pickedImage == null ? 'Fotoğraf Ekle' : 'Fotoğraf Seçildi',
-              ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Temizlik Türü',
+              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
             ),
-            if (pickedImage != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                pickedImage!.path.split(Platform.pathSeparator).last,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                _statusChip('completed', 'Tamamlandı', Icons.check_circle),
+                _statusChip('on_time', 'Zamanında', Icons.schedule),
+                _statusChip('late', 'Geç', Icons.warning_amber),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickPhoto,
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text('Fotoğraf Ekle'),
+                ),
+                if (pickedImage != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      pickedImage!,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               controller: notesController,
-              maxLines: 4,
+              maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'Not',
-                hintText: 'İsteğe bağlı not ekleyin',
-                border: OutlineInputBorder(),
+                labelText: 'Not (opsiyonel)',
+                hintText:
+                    'Yapılan işler, dikkat edilmesi gereken noktalar...',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.xl),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -347,11 +470,15 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
                     ? const SizedBox(
                         height: 18,
                         width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text('Temizlik Yapıldı'),
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
           ],
         ),
       ),
