@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -11,34 +12,46 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final oldPasswordController = TextEditingController();
-  final newPasswordController = TextEditingController();
-  final confirmPasswordController = TextEditingController();
-  bool isLoading = false;
+  final _oldPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  bool _isLoading = false;
+  bool _obscureOld = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  @override
+  void dispose() {
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _changePassword() async {
-    final oldPassword = oldPasswordController.text.trim();
-    final newPassword = newPasswordController.text.trim();
-    final confirmPassword = confirmPasswordController.text.trim();
+    final oldPassword = _oldPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
 
     if (oldPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
-      _showSnackBar('Tüm alanlar zorunludur');
+      _showErrorSnackBar('Tüm alanlar zorunludur.');
       return;
     }
-    if (newPassword.length < 8) {
-      _showSnackBar('Yeni şifre en az 8 karakter olmalı');
+    if (newPassword.length < 6) {
+      _showErrorSnackBar('Yeni şifre en az 6 karakter olmalı.');
       return;
     }
     if (newPassword != confirmPassword) {
-      _showSnackBar('Yeni şifreler eşleşmiyor');
+      _showErrorSnackBar('Şifreler eşleşmiyor.');
       return;
     }
     if (oldPassword == newPassword) {
-      _showSnackBar('Yeni şifre eskisinden farklı olmalı');
+      _showErrorSnackBar('Yeni şifre eskisinden farklı olmalı.');
       return;
     }
 
-    setState(() => isLoading = true);
+    setState(() => _isLoading = true);
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token') ?? '';
@@ -56,7 +69,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         }),
       );
 
-      setState(() => isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
       if (response.statusCode == 200) {
         await prefs.remove('token');
@@ -66,104 +80,135 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şifre değiştirildi. Lütfen tekrar giriş yapın.')),
+          const SnackBar(
+            content: Text('Şifreniz başarıyla değiştirildi. Tekrar giriş yapınız.'),
+          ),
         );
         Navigator.pushReplacementNamed(context, '/login');
       } else {
-        String message = 'Şifre değiştirilemedi';
+        String message = 'Şifre değiştirilemedi.';
         try {
           final body = jsonDecode(response.body);
           if (body is Map<String, dynamic> && body['message'] != null) {
             message = body['message'] as String;
           }
         } catch (_) {}
-        _showSnackBar(message);
+        _showErrorSnackBar(message);
       }
     } catch (e) {
-      setState(() => isLoading = false);
-      _showSnackBar('Bir hata oluştu: $e');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showErrorSnackBar('Bir hata oluştu: $e');
     }
   }
 
-  void _showSnackBar(String message) {
+  void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+      ),
     );
   }
 
-  @override
-  void dispose() {
-    oldPasswordController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
-    super.dispose();
+  Widget _passwordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.lock_outline),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: AppColors.textSecondary,
+          ),
+          onPressed: onToggle,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text('Şifre Değiştir'),
-        backgroundColor: Colors.grey[100],
-      ),
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          width: 320,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Şifre Değiştir',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 30),
-              TextField(
-                controller: oldPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Eski Şifre',
-                  border: OutlineInputBorder(),
+      appBar: AppBar(title: const Text('Şifre Değiştir')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Bilgi kartı
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
                 ),
               ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: newPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Yeni Şifre',
-                  border: OutlineInputBorder(),
-                ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.lock_outline,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Expanded(
+                    child: Text(
+                      'Hesabınızın güvenliği için güçlü bir şifre seçin.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Yeni Şifre Tekrar',
-                  border: OutlineInputBorder(),
-                ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _passwordField(
+              controller: _oldPasswordController,
+              label: 'Mevcut Şifre',
+              obscure: _obscureOld,
+              onToggle: () => setState(() => _obscureOld = !_obscureOld),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _passwordField(
+              controller: _newPasswordController,
+              label: 'Yeni Şifre',
+              obscure: _obscureNew,
+              onToggle: () => setState(() => _obscureNew = !_obscureNew),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _passwordField(
+              controller: _confirmPasswordController,
+              label: 'Yeni Şifre Tekrar',
+              obscure: _obscureConfirm,
+              onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _changePassword,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Şifremi Değiştir'),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : _changePassword,
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Şifreyi Değiştir'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
