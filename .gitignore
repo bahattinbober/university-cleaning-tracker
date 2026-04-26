@@ -16,3 +16,9 @@ Thumbs.db
 
 # Cursor IDE settings
 .cursor/
+
+# Jest coverage reports
+backend/backend/coverage/
+
+# Test env
+backend/backend/.env.test
