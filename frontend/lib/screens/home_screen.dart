@@ -52,6 +52,14 @@ class HomeScreen extends StatelessWidget {
                 if (isAdmin) ..._adminSections(context) else ..._staffSections(context),
                 _sectionHeader('HESAP'),
                 MenuCard(
+                  title: 'Kişisel Bilgilerim',
+                  subtitle: 'Hesap detaylarını görüntüle',
+                  icon: Icons.account_circle_outlined,
+                  color: AppColors.primary,
+                  onTap: () => Navigator.pushNamed(context, '/profile'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                MenuCard(
                   title: 'Şifre Değiştir',
                   icon: Icons.lock_outline,
                   color: AppColors.primary,

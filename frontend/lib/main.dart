@@ -13,6 +13,7 @@ import 'screens/admin_weekly_kpi_screen.dart';
 import 'screens/admin_scheduled_task_screen.dart';
 import 'screens/my_scheduled_tasks_screen.dart';
 import 'screens/change_password_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -41,6 +42,7 @@ class MyApp extends StatelessWidget {
         "/admin-scheduled-task": (context) => const AdminScheduledTaskScreen(),
         "/my-scheduled-tasks": (context) => const MyScheduledTasksScreen(),
         "/change-password": (context) => const ChangePasswordScreen(),
+        "/profile": (context) => const ProfileScreen(),
       },
 
       theme: AppTheme.lightTheme,

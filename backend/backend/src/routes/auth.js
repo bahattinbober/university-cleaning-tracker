@@ -141,4 +141,17 @@ router.put('/change-password', authMiddleware, (req, res) => {
   });
 });
 
+// GET /api/auth/me
+router.get('/me', authMiddleware, (req, res) => {
+  db.get(
+    `SELECT id, name, email, role, employee_no, department, approval_status FROM users WHERE id = ?`,
+    [req.user.id],
+    (err, row) => {
+      if (err) return res.status(500).json({ message: 'DB hatası' });
+      if (!row) return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+      res.json(row);
+    }
+  );
+});
+
 module.exports = router;
