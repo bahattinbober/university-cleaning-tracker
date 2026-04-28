@@ -1,22 +1,38 @@
-﻿<div align="center">
+<div align="center">
 
-# Temizlik Takip Sistemi
+# 🧹 Temizlik Takip Sistemi
 
 ### Cleaning Management System for University Personnel
 
-Pamukkale Universitesi kampus temizlik personelinin gunluk temizlik gorevlerini kayit altina aldigi, yoneticilerin haftalik performans verilerini takip edebildigi fullstack mobil uygulamadir.
+Pamukkale Üniversitesi kampüs temizlik personelinin günlük temizlik görevlerini kayıt altına aldığı, yöneticilerin haftalık performans verilerini takip edebildiği fullstack mobil uygulamadır.
+
+[![Tests](https://img.shields.io/badge/tests-21%20passing-success)]()
+[![Backend](https://img.shields.io/badge/backend-Node.js%2022-339933?logo=node.js&logoColor=white)]()
+[![Frontend](https://img.shields.io/badge/frontend-Flutter%203.10-02569B?logo=flutter&logoColor=white)]()
+[![Database](https://img.shields.io/badge/database-SQLite-003B57?logo=sqlite&logoColor=white)]()
+[![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 </div>
 
 ---
 
-## Demo
+## 📱 Demo
 
 <table>
+  <tr>
+    <td align="center"><b>Giriş</b></td>
+    <td align="center"><b>Yönetim Paneli</b></td>
+    <td align="center"><b>Personel Paneli</b></td>
+  </tr>
   <tr>
     <td><img src="docs/screenshots/login.png" width="240"/></td>
     <td><img src="docs/screenshots/home-top.png" width="240"/></td>
     <td><img src="docs/screenshots/home-bottom.png" width="240"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Haftalık KPI</b></td>
+    <td align="center"><b>Planlı Görev</b></td>
+    <td></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/kpi.png" width="240"/></td>
@@ -27,59 +43,35 @@ Pamukkale Universitesi kampus temizlik personelinin gunluk temizlik gorevlerini 
 
 ---
 
-## Vizyon
+## 🎯 Vizyon
 
-Universite kampuslerinde temizlik personeli takibi genellikle kagit cizelgelerle veya WhatsApp gruplari uzerinden yapilir. Bu proje QR kod ile lokasyon dogrulamali temizlik kaydi ve haftalik KPI skorlamasiyla bu sureci dijitallestirir.
-
----
-
-## Ozellikler
-
-- QR kod ile temizlik kaydi
-- Haftalik KPI skoru ve madalya siralamasi
-- Admin onay tabanli kayit sistemi
-- Role-based access control (admin / staff)
-- @pau.edu.tr domain kisitli kayit
-- JWT authentication 8 saatlik token
-- bcrypt sifre sakla 10 round
-- Tam Turkce arayuz
+Üniversite kampüslerinde temizlik personeli takibi genellikle kâğıt çizelgelerle veya WhatsApp grupları üzerinden yapılır — şeffaf değildir, ölçülemez, adil değildir. Bu proje, **QR kod ile lokasyon doğrulamalı temizlik kaydı** ve **haftalık KPI skorlamasıyla** bu süreci dijitalleştirir.
 
 ---
 
-## KPI Formulu
+## ✨ Özellikler
 
-skor = (toplam_gorev x 5) + (tamamlanan x 3) + (notlu x 1) + (fotografli x 2) + (zamaninda x 4) - (gec x 2)
+### Personel İçin
 
-Literatur referansi: Balanced Scorecard (Kaplan and Norton, 1996)
+- 📷 QR kod ile temizlik kaydı (not + fotoğraf opsiyonel)
+- 📋 Planlı görev takibi
+- 📊 Geçmiş kayıtları gözden geçir
 
----
+### Yönetici İçin
 
-## Kurulum
+- ✅ Kullanıcı onay sistemi
+- 📅 Görev planlama (oda + personel + tarih/saat)
+- 🏆 Haftalık KPI sıralaması (madalya pozisyonlu)
+- 👥 Personel detay incelemesi
 
-Backend:
-cd backend/backend
-npm install
-npm run dev
+### Sistem
 
-Frontend:
-cd frontend
-flutter pub get
-flutter run
-
-Test:
-cd backend/backend
-npm test
-
----
-
-## Test
-
-21 integration testi, 4 test suite, ortalama 3 saniye
+- 🔐 JWT authentication (8 saat)
+- 🛡️ Role-based access control
+- 🌐 @pau.edu.tr domain kısıtı
+- 🔒 bcrypt şifreleme (NIST uyumlu)
+- 🇹🇷 Tam Türkçe arayüz
 
 ---
 
-## Akademik
-
-Yazar: Bahattin Bober
-Universite: Pamukkale Universitesi
-Yil: 2026
+## 📐 KPI Formülü
