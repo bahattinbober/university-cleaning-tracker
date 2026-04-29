@@ -16,11 +16,19 @@ class _RoomsScreenState extends State<RoomsScreen> {
   bool isLoading = true;
   String? errorMessage;
   List<dynamic> rooms = [];
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
+    _loadRole();
     _fetchRooms();
+  }
+
+  Future<void> _loadRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString('userRole');
+    if (mounted) setState(() => _isAdmin = role == 'admin');
   }
 
   Future<void> _fetchRooms() async {
@@ -66,8 +74,141 @@ class _RoomsScreenState extends State<RoomsScreen> {
     }
   }
 
-  // Sadece sayıdan oluşan veya boş/eksik location_name değerlerini filtreler.
-  // Eski kayıtlarda location_name yerine location_id sayısı gelebilir.
+  Future<void> _createRoom(
+    BuildContext dialogContext,
+    String name,
+    String description,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:4000/api/rooms'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'name': name,
+          'description': description.isEmpty ? null : description,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (dialogContext.mounted) Navigator.pop(dialogContext);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Oda başarıyla eklendi'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        _fetchRooms();
+      } else {
+        String message = 'Oda eklenemedi';
+        try {
+          final body = jsonDecode(response.body);
+          if (body is Map && body['message'] != null) {
+            message = body['message'] as String;
+          }
+        } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: AppColors.error),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  Future<void> _showAddRoomDialog() async {
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        bool isSubmitting = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocalState) => AlertDialog(
+            title: const Text('Yeni Oda Ekle'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Oda Adı',
+                      hintText: 'Örn: A101, K339',
+                      prefixIcon: Icon(Icons.meeting_room),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    controller: descController,
+                    decoration: const InputDecoration(
+                      labelText: 'Açıklama (opsiyonel)',
+                      hintText: 'Örn: Toplantı odası',
+                      prefixIcon: Icon(Icons.info_outline),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                child: const Text('İptal'),
+              ),
+              FilledButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        final name = nameController.text.trim();
+                        if (name.isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('Oda adı zorunlu'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                          return;
+                        }
+                        setLocalState(() => isSubmitting = true);
+                        await _createRoom(
+                          ctx,
+                          name,
+                          descController.text.trim(),
+                        );
+                        setLocalState(() => isSubmitting = false);
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Ekle'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+  }
+
   bool _isValidLocationName(String? value) {
     if (value == null || value.isEmpty || value == '-') return false;
     if (RegExp(r'^\d+$').hasMatch(value)) return false;
@@ -170,6 +311,15 @@ class _RoomsScreenState extends State<RoomsScreen> {
           ),
         ],
       ),
+      floatingActionButton: _isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _showAddRoomDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Oda Ekle'),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null

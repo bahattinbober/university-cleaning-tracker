@@ -30,15 +30,16 @@ router.post('/', (req, res) => {
   }
 
   const { location_id, name, description } = req.body;
+  const trimmedName = name ? String(name).trim() : '';
 
-  if (!location_id || !name) {
-    return res.status(400).json({ message: 'location_id ve name zorunlu' });
+  if (!trimmedName) {
+    return res.status(400).json({ message: 'name zorunlu' });
   }
 
   db.run(
     `INSERT INTO rooms (location_id, name, description)
      VALUES (?, ?, ?)`,
-    [location_id, name, description || null],
+    [location_id || null, trimmedName, description ? String(description).trim() : null],
     function (err) {
       if (err) {
         console.error('Room ekleme hata:', err.message);
@@ -46,9 +47,9 @@ router.post('/', (req, res) => {
       }
       res.status(201).json({
         id: this.lastID,
-        location_id,
-        name,
-        description: description || null,
+        location_id: location_id || null,
+        name: trimmedName,
+        description: description ? String(description).trim() : null,
       });
     }
   );
