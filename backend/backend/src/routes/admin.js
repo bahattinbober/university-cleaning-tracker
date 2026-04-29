@@ -239,4 +239,39 @@ router.get('/user-logs/:userId', ensureAdmin, (req, res) => {
   });
 });
 
+// DELETE /api/admin/users/:id -> kullanıcıyı sil
+router.delete('/users/:id', ensureAdmin, (req, res) => {
+  const targetId = parseInt(req.params.id, 10);
+  const adminId = req.user.id;
+
+  if (isNaN(targetId)) {
+    return res.status(400).json({ message: 'Geçersiz kullanıcı id' });
+  }
+
+  if (targetId === adminId) {
+    return res.status(400).json({ message: 'Kendi hesabınızı silemezsiniz' });
+  }
+
+  db.get('SELECT id, role FROM users WHERE id = ?', [targetId], (err, row) => {
+    if (err) return res.status(500).json({ message: 'DB hatası' });
+    if (!row) return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+
+    if (row.role === 'admin') {
+      return res.status(403).json({ message: 'Diğer admini silemezsiniz' });
+    }
+
+    db.serialize(() => {
+      db.run('DELETE FROM cleaning_logs WHERE user_id = ?', [targetId]);
+      db.run('DELETE FROM scheduled_tasks WHERE assigned_user_id = ?', [targetId]);
+      db.run('DELETE FROM users WHERE id = ?', [targetId], function (deleteErr) {
+        if (deleteErr) return res.status(500).json({ message: 'Silme hatası' });
+        if (this.changes === 0) {
+          return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+        }
+        return res.json({ message: 'Kullanıcı başarıyla silindi', deletedId: targetId });
+      });
+    });
+  });
+});
+
 module.exports = router;
