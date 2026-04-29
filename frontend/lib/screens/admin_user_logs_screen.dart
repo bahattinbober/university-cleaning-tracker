@@ -101,7 +101,11 @@ class _AdminUserLogsScreenState extends State<AdminUserLogsScreen> {
     }
   }
 
-  Widget? _buildThumbnail(String? rawImage) {
+  Widget? _buildThumbnail(
+    String? rawImage, {
+    String? roomName,
+    String? cleanedAt,
+  }) {
     if (rawImage == null || rawImage.trim().isEmpty) return null;
     final imageData = rawImage.trim();
     final isUrl =
@@ -128,31 +132,37 @@ class _AdminUserLogsScreenState extends State<AdminUserLogsScreen> {
       }
     }
 
-    return GestureDetector(
-      onTap: () => _showFullImage(imageData, isUrl),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: imageWidget,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _showFullImage(
+          imageData,
+          isUrl,
+          roomName: roomName,
+          cleanedAt: cleanedAt,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: imageWidget,
+        ),
       ),
     );
   }
 
-  void _showFullImage(String imageData, bool isUrl) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: Container(
-          color: Colors.black,
-          padding: const EdgeInsets.all(8),
-          child: InteractiveViewer(
-            child: isUrl
-                ? Image.network(imageData, fit: BoxFit.contain)
-                : Image.memory(
-                    base64Decode(imageData.split(',').last),
-                    fit: BoxFit.contain,
-                  ),
-          ),
+  void _showFullImage(
+    String imageData,
+    bool isUrl, {
+    String? roomName,
+    String? cleanedAt,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => FullScreenImageViewer(
+          imageData: imageData,
+          isUrl: isUrl,
+          roomName: roomName,
+          cleanedAt: cleanedAt,
         ),
       ),
     );
@@ -215,7 +225,11 @@ class _AdminUserLogsScreenState extends State<AdminUserLogsScreen> {
     // status bu endpoint'ten dönmüyor; tüm kayıtlar 'completed' olduğundan fallback.
     final status = log['status']?.toString() ?? 'completed';
     final statusLabel = StatusTranslator.cleaningStatus(status);
-    final thumbnail = _buildThumbnail(rawImage);
+    final thumbnail = _buildThumbnail(
+      rawImage,
+      roomName: roomName,
+      cleanedAt: cleanedAt,
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -372,6 +386,134 @@ class _AdminUserLogsScreenState extends State<AdminUserLogsScreen> {
                     ],
                   ),
                 ),
+    );
+  }
+}
+
+class FullScreenImageViewer extends StatefulWidget {
+  const FullScreenImageViewer({
+    super.key,
+    required this.imageData,
+    required this.isUrl,
+    this.roomName,
+    this.cleanedAt,
+  });
+
+  final String imageData;
+  final bool isUrl;
+  final String? roomName;
+  final String? cleanedAt;
+
+  @override
+  State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
+  final _transformController = TransformationController();
+
+  @override
+  void dispose() {
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  void _resetZoom() {
+    _transformController.value = Matrix4.identity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = widget.isUrl
+        ? Image.network(widget.imageData, fit: BoxFit.contain)
+        : Image.memory(
+            base64Decode(widget.imageData.split(',').last),
+            fit: BoxFit.contain,
+          );
+
+    final hasInfo = widget.roomName != null || widget.cleanedAt != null;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: const Text('Temizlik Fotoğrafı'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Stack(
+        children: [
+          GestureDetector(
+            onDoubleTap: _resetZoom,
+            child: Center(
+              child: InteractiveViewer(
+                transformationController: _transformController,
+                minScale: 0.5,
+                maxScale: 4.0,
+                panEnabled: true,
+                child: image,
+              ),
+            ),
+          ),
+          if (hasInfo)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                color: Colors.black.withValues(alpha: 0.7),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (widget.roomName != null)
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.meeting_room,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.roomName!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    if (widget.cleanedAt != null)
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.cleanedAt!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
