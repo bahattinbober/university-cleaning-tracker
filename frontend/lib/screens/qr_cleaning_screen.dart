@@ -231,7 +231,7 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/rooms'),
+        Uri.parse('http://192.168.1.27:4000/api/rooms'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -291,7 +291,7 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
     try {
       final imageBase64 = await _imageToBase64();
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:4000/api/cleaning-logs'),
+        Uri.parse('http://192.168.1.27:4000/api/cleaning-logs'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

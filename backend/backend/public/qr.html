@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Temizlik QR Kod Sistemi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f6f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #1a1a2e;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 32px;
+      letter-spacing: -0.3px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .select-row {
+      width: 100%;
+      display: flex;
+      gap: 10px;
+    }
+
+    select {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      background: #fff;
+      color: #1a1a2e;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus { border-color: #4f46e5; }
+
+    button {
+      padding: 10px 16px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #4338ca; }
+
+    #qr-container {
+      width: 300px;
+      height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fafafa;
+      border-radius: 12px;
+      border: 1.5px solid #e5e7eb;
+    }
+
+    #qr-container canvas,
+    #qr-container img {
+      border-radius: 6px;
+    }
+
+    .room-info {
+      width: 100%;
+      text-align: center;
+    }
+
+    .room-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+
+    .room-desc {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .room-id {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+
+    .error {
+      color: #dc2626;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #4f46e5;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <h1>Temizlik QR Kod Sistemi</h1>
+
+  <div class="card">
+    <div class="select-row">
+      <select id="room-select" onchange="onRoomChange()">
+        <option value="">Yükleniyor...</option>
+      </select>
+      <button onclick="loadRooms()">Yenile</button>
+    </div>
+
+    <div id="qr-container">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="room-info" id="room-info" style="display:none">
+      <div class="room-name" id="room-name"></div>
+      <div class="room-desc" id="room-desc"></div>
+      <div class="room-id" id="room-id-label"></div>
+    </div>
+
+    <div class="error" id="error-msg" style="display:none"></div>
+  </div>
+
+  <script>
+    let rooms = [];
+    let qrInstance = null;
+
+    async function loadRooms() {
+      const select = document.getElementById('room-select');
+      const errEl = document.getElementById('error-msg');
+      errEl.style.display = 'none';
+      select.innerHTML = '<option value="">Yükleniyor...</option>';
+      showSpinner();
+
+      try {
+        const res = await fetch('/api/public/rooms');
+        if (!res.ok) throw new Error('Sunucu hatası: ' + res.status);
+        rooms = await res.json();
+
+        if (!rooms.length) {
+          select.innerHTML = '<option value="">Oda bulunamadı</option>';
+          showSpinner();
+          return;
+        }
+
+        select.innerHTML = rooms.map(r =>
+          `<option value="${r.id}">${r.name}</option>`
+        ).join('');
+
+        select.value = rooms[0].id;
+        generateQR(rooms[0]);
+      } catch (e) {
+        select.innerHTML = '<option value="">Hata oluştu</option>';
+        errEl.textContent = 'Oda listesi alınamadı: ' + e.message;
+        errEl.style.display = 'block';
+        showSpinner();
+      }
+    }
+
+    function onRoomChange() {
+      const id = parseInt(document.getElementById('room-select').value);
+      const room = rooms.find(r => r.id === id);
+      if (room) generateQR(room);
+    }
+
+    function generateQR(room) {
+      const container = document.getElementById('qr-container');
+      container.innerHTML = '';
+
+      if (qrInstance) {
+        qrInstance = null;
+      }
+
+      qrInstance = new QRCode(container, {
+        text: String(room.id),
+        width: 280,
+        height: 280,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+
+      document.getElementById('room-name').textContent = room.name;
+      document.getElementById('room-desc').textContent = room.description || '';
+      document.getElementById('room-id-label').textContent = 'ID: ' + room.id;
+      document.getElementById('room-info').style.display = 'block';
+      document.getElementById('error-msg').style.display = 'none';
+    }
+
+    function showSpinner() {
+      const container = document.getElementById('qr-container');
+      container.innerHTML = '<div class="spinner"></div>';
+      document.getElementById('room-info').style.display = 'none';
+    }
+
+    loadRooms();
+  </script>
+</body>
+</html>

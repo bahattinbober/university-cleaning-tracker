@@ -45,7 +45,7 @@ class _AdminWeeklyKpiScreenState extends State<AdminWeeklyKpiScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/admin/weekly-kpi'),
+        Uri.parse('http://192.168.1.27:4000/api/admin/weekly-kpi'),
         headers: {'Authorization': 'Bearer $token'},
       );
 

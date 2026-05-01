@@ -58,7 +58,7 @@ class _AdminUserLogsScreenState extends State<AdminUserLogsScreen> {
 
       final response = await http.get(
         Uri.parse(
-          'http://10.0.2.2:4000/api/admin/user-logs/${widget.userId}',
+          'http://192.168.1.27:4000/api/admin/user-logs/${widget.userId}',
         ),
         headers: {'Authorization': 'Bearer $token'},
       );

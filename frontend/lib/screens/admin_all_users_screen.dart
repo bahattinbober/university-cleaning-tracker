@@ -40,7 +40,7 @@ class _AdminAllUsersScreenState extends State<AdminAllUsersScreen> {
       final token = prefs.getString('token');
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/users'),
+        Uri.parse('http://192.168.1.27:4000/api/users'),
         headers: { if (token != null) 'Authorization': 'Bearer $token' },
       );
 
@@ -89,7 +89,7 @@ class _AdminAllUsersScreenState extends State<AdminAllUsersScreen> {
       final token = prefs.getString('token');
 
       final response = await http.delete(
-        Uri.parse('http://10.0.2.2:4000/api/admin/users/$userId'),
+        Uri.parse('http://192.168.1.27:4000/api/admin/users/$userId'),
         headers: { if (token != null) 'Authorization': 'Bearer $token' },
       );
 

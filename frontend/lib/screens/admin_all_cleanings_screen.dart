@@ -44,7 +44,7 @@ class _AdminAllCleaningsScreenState extends State<AdminAllCleaningsScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/cleaning'),
+        Uri.parse('http://192.168.1.27:4000/api/cleaning'),
         headers: {'Authorization': 'Bearer $token'},
       );
 

@@ -35,7 +35,7 @@ class _MyScheduledTasksScreenState extends State<MyScheduledTasksScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/tasks/my-scheduled'),
+        Uri.parse('http://192.168.1.27:4000/api/tasks/my-scheduled'),
         headers: {'Authorization': 'Bearer $token'},
       );
 

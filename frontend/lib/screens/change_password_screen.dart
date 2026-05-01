@@ -58,7 +58,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('http://10.0.2.2:4000/api/auth/change-password'),
+        Uri.parse('http://192.168.1.27:4000/api/auth/change-password'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

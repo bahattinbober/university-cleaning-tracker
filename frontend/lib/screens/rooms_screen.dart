@@ -50,7 +50,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/rooms'),
+        Uri.parse('http://192.168.1.27:4000/api/rooms'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -84,7 +84,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
       final token = prefs.getString('token');
 
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:4000/api/rooms'),
+        Uri.parse('http://192.168.1.27:4000/api/rooms'),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',

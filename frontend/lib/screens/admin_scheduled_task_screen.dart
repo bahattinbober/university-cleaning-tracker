@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 
-const _baseUrl = 'http://10.0.2.2:4000';
+const _baseUrl = 'http://192.168.1.27:4000';
 
 const _monthNames = [
   '', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',

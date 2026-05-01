@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final token = prefs.getString('token');
       if (token == null) return;
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/tasks/my-scheduled'),
+        Uri.parse('http://192.168.1.27:4000/api/tasks/my-scheduled'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200 && mounted) {
@@ -61,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final token = prefs.getString('token');
       if (token != null) {
         final response = await http.get(
-          Uri.parse('http://10.0.2.2:4000/api/tasks/my-scheduled'),
+          Uri.parse('http://192.168.1.27:4000/api/tasks/my-scheduled'),
           headers: {'Authorization': 'Bearer $token'},
         );
         if (response.statusCode == 200) {

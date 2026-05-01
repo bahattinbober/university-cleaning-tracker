@@ -41,7 +41,7 @@ class _AdminPendingUsersScreenState extends State<AdminPendingUsersScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4000/api/admin/pending-users'),
+        Uri.parse('http://192.168.1.27:4000/api/admin/pending-users'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -73,7 +73,7 @@ class _AdminPendingUsersScreenState extends State<AdminPendingUsersScreen> {
 
       final endpoint = approve ? 'approve-user' : 'reject-user';
       final response = await http.put(
-        Uri.parse('http://10.0.2.2:4000/api/admin/$endpoint/$userId'),
+        Uri.parse('http://192.168.1.27:4000/api/admin/$endpoint/$userId'),
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer $token' },
       );
 
