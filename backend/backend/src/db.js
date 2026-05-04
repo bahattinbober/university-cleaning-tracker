@@ -97,6 +97,8 @@ db.serialize(() => {
       location_id INTEGER,
       name TEXT,
       description TEXT,
+      latitude REAL,
+      longitude REAL,
       FOREIGN KEY (location_id) REFERENCES locations(id)
     )
   `);
@@ -204,6 +206,28 @@ db.serialize(() => {
         } else {
           console.log('✅ cleaning_logs tablosuna image alanı eklendi');
         }
+      });
+    }
+  });
+
+  // Eski veritabanları için rooms lat/lng alanlarını güvenli şekilde ekle
+  db.all(`PRAGMA table_info(rooms)`, [], (tableErr, columns) => {
+    if (tableErr) {
+      console.error('❌ rooms şema kontrol hatası:', tableErr.message);
+      return;
+    }
+    const hasLatitude = columns.some((c) => c.name === 'latitude');
+    const hasLongitude = columns.some((c) => c.name === 'longitude');
+    if (!hasLatitude) {
+      db.run(`ALTER TABLE rooms ADD COLUMN latitude REAL`, (alterErr) => {
+        if (alterErr) console.error('❌ rooms latitude alanı ekleme hatası:', alterErr.message);
+        else console.log('✅ rooms tablosuna latitude alanı eklendi');
+      });
+    }
+    if (!hasLongitude) {
+      db.run(`ALTER TABLE rooms ADD COLUMN longitude REAL`, (alterErr) => {
+        if (alterErr) console.error('❌ rooms longitude alanı ekleme hatası:', alterErr.message);
+        else console.log('✅ rooms tablosuna longitude alanı eklendi');
       });
     }
   });

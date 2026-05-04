@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -49,9 +51,60 @@ class _QRCleaningScreenState extends State<QRCleaningScreen> {
       return;
     }
 
+    // Odanın lat/lng bilgisini çek
+    double? roomLat;
+    double? roomLng;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token != null) {
+        final response = await http.get(
+          Uri.parse('http://192.168.1.27:4000/api/rooms'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (response.statusCode == 200) {
+          final rooms = (jsonDecode(response.body) as List)
+              .cast<Map<String, dynamic>>();
+          final found = rooms.firstWhere(
+            (r) => r['id'] == roomId,
+            orElse: () => <String, dynamic>{},
+          );
+          roomLat = (found['latitude'] as num?)?.toDouble();
+          roomLng = (found['longitude'] as num?)?.toDouble();
+        }
+      }
+    } catch (_) {
+      // API hatası → konum kontrolünü atla
+    }
+
+    if (mounted) setState(() => lastMessage = 'Konum doğrulanıyor...');
+
+    final (locationOk, locationError) =
+        await _verifyLocation(roomLat, roomLng);
+
+    if (!locationOk) {
+      if (mounted) {
+        setState(() {
+          isProcessing = false;
+          lastMessage = null;
+        });
+        if (locationError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(locationError),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       hasNavigatedToForm = true;
       isProcessing = false;
+      lastMessage = null;
     });
 
     await Navigator.push(
@@ -66,6 +119,70 @@ class _QRCleaningScreenState extends State<QRCleaningScreen> {
       hasNavigatedToForm = false;
       lastMessage = 'Yeni kayıt için tekrar QR okutabilirsiniz.';
     });
+  }
+
+  Future<(bool, String?)> _verifyLocation(
+      double? roomLat, double? roomLng) async {
+    if (roomLat == null || roomLng == null) return (true, null);
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return (false, 'Konum servisleri kapalı. Lütfen GPS\'i açın.');
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return (false, 'Konum izni reddedildi.');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return (
+          false,
+          'Konum izni kalıcı olarak reddedildi. Ayarlardan izin verin.'
+        );
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      final distance = _calculateDistance(
+        position.latitude,
+        position.longitude,
+        roomLat,
+        roomLng,
+      );
+
+      if (distance > 50) {
+        return (
+          false,
+          'Odaya çok uzaktasınız (${distance.round()} metre). En fazla 50 metre yakın olmalısınız.'
+        );
+      }
+
+      return (true, null);
+    } catch (_) {
+      return (true, null); // GPS hatası → bypass
+    }
+  }
+
+  double _calculateDistance(
+      double lat1, double lng1, double lat2, double lng2) {
+    const earthRadius = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLng = (lng2 - lng1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) *
+            math.cos(lat2 * math.pi / 180) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
   }
 
   @override

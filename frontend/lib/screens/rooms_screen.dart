@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
@@ -78,6 +79,8 @@ class _RoomsScreenState extends State<RoomsScreen> {
     BuildContext dialogContext,
     String name,
     String description,
+    double? latitude,
+    double? longitude,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -92,6 +95,8 @@ class _RoomsScreenState extends State<RoomsScreen> {
         body: jsonEncode({
           'name': name,
           'description': description.isEmpty ? null : description,
+          'latitude': latitude,
+          'longitude': longitude,
         }),
       );
 
@@ -134,6 +139,10 @@ class _RoomsScreenState extends State<RoomsScreen> {
       context: context,
       builder: (ctx) {
         bool isSubmitting = false;
+        double? currentLat;
+        double? currentLng;
+        bool isLoadingLocation = false;
+
         return StatefulBuilder(
           builder: (ctx, setLocalState) => AlertDialog(
             title: const Text('Yeni Oda Ekle'),
@@ -159,6 +168,100 @@ class _RoomsScreenState extends State<RoomsScreen> {
                       prefixIcon: Icon(Icons.info_outline),
                     ),
                     maxLines: 2,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on,
+                            color: AppColors.primary, size: 18),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            currentLat != null
+                                ? '✓ ${currentLat!.toStringAsFixed(5)}, ${currentLng!.toStringAsFixed(5)}'
+                                : 'Konum henüz alınmadı',
+                            style: AppTextStyles.caption,
+                          ),
+                        ),
+                        if (isLoadingLocation)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm),
+                              minimumSize: Size.zero,
+                            ),
+                            onPressed: () async {
+                              setLocalState(() => isLoadingLocation = true);
+                              final messenger =
+                                  ScaffoldMessenger.of(context);
+                              try {
+                                final serviceEnabled = await Geolocator
+                                    .isLocationServiceEnabled();
+                                if (!serviceEnabled) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'GPS kapalı. Lütfen açın.')),
+                                  );
+                                  return;
+                                }
+                                LocationPermission permission =
+                                    await Geolocator.checkPermission();
+                                if (permission ==
+                                    LocationPermission.denied) {
+                                  permission =
+                                      await Geolocator.requestPermission();
+                                }
+                                if (permission ==
+                                        LocationPermission.denied ||
+                                    permission ==
+                                        LocationPermission.deniedForever) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('Konum izni reddedildi.')),
+                                  );
+                                  return;
+                                }
+                                final pos =
+                                    await Geolocator.getCurrentPosition(
+                                  locationSettings: const LocationSettings(
+                                      accuracy: LocationAccuracy.high),
+                                );
+                                setLocalState(() {
+                                  currentLat = pos.latitude;
+                                  currentLng = pos.longitude;
+                                });
+                              } catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                      content:
+                                          Text('Konum alınamadı: $e')),
+                                );
+                              } finally {
+                                setLocalState(
+                                    () => isLoadingLocation = false);
+                              }
+                            },
+                            child: const Text('Konumu Al'),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -187,6 +290,8 @@ class _RoomsScreenState extends State<RoomsScreen> {
                           ctx,
                           name,
                           descController.text.trim(),
+                          currentLat,
+                          currentLng,
                         );
                         setLocalState(() => isSubmitting = false);
                       },
@@ -206,7 +311,6 @@ class _RoomsScreenState extends State<RoomsScreen> {
         );
       },
     );
-
   }
 
   bool _isValidLocationName(String? value) {

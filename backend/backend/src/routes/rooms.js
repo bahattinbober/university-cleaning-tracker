@@ -10,6 +10,8 @@ router.get('/', (req, res) => {
            rooms.name,
            rooms.description,
            rooms.location_id,
+           rooms.latitude,
+           rooms.longitude,
            locations.name AS location_name
     FROM rooms
     LEFT JOIN locations ON rooms.location_id = locations.id
@@ -29,17 +31,26 @@ router.post('/', (req, res) => {
     return res.status(403).json({ message: 'Yetkiniz yok (admin değil)' });
   }
 
-  const { location_id, name, description } = req.body;
+  const { location_id, name, description, latitude, longitude } = req.body;
   const trimmedName = name ? String(name).trim() : '';
 
   if (!trimmedName) {
     return res.status(400).json({ message: 'name zorunlu' });
   }
 
+  const lat = latitude != null ? Number(latitude) : null;
+  const lng = longitude != null ? Number(longitude) : null;
+
   db.run(
-    `INSERT INTO rooms (location_id, name, description)
-     VALUES (?, ?, ?)`,
-    [location_id || null, trimmedName, description ? String(description).trim() : null],
+    `INSERT INTO rooms (location_id, name, description, latitude, longitude)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      location_id || null,
+      trimmedName,
+      description ? String(description).trim() : null,
+      lat,
+      lng,
+    ],
     function (err) {
       if (err) {
         console.error('Room ekleme hata:', err.message);
@@ -50,6 +61,8 @@ router.post('/', (req, res) => {
         location_id: location_id || null,
         name: trimmedName,
         description: description ? String(description).trim() : null,
+        latitude: lat,
+        longitude: lng,
       });
     }
   );
