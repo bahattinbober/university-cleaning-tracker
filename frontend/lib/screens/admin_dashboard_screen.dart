@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 import '../theme/app_theme.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -14,6 +17,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
+  bool _isExporting = false;
   Map<String, dynamic>? _data;
   String? _errorMessage;
 
@@ -61,12 +65,83 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<void> _exportExcel() async {
+    setState(() => _isExporting = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Oturum bulunamadı')),
+          );
+        }
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('http://192.168.1.27:4000/api/admin/export'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('İndirme başarısız: ${response.statusCode}');
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final today = DateTime.now().toIso8601String().split('T').first;
+      final file = File('${dir.path}/temizlik_raporu_$today.xlsx');
+      await file.writeAsBytes(response.bodyBytes);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Excel raporu hazır'),
+          backgroundColor: AppColors.success,
+          action: SnackBarAction(
+            label: 'AÇ',
+            textColor: Colors.white,
+            onPressed: () => OpenFilex.open(file.path),
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hata: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
+          IconButton(
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : const Icon(Icons.file_download),
+            tooltip: 'Excel İndir',
+            onPressed: _isExporting ? null : _exportExcel,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Yenile',

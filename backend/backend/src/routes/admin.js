@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const XLSX = require('xlsx');
 
 const router = express.Router();
 
@@ -272,6 +273,93 @@ router.delete('/users/:id', ensureAdmin, (req, res) => {
       });
     });
   });
+});
+
+// GET /api/admin/export -> Excel raporu indir
+router.get('/export', ensureAdmin, (req, res) => {
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 7);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  const dbQuery = (sql, params) =>
+    new Promise((resolve, reject) =>
+      db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)))
+    );
+
+  Promise.all([
+    dbQuery(
+      `SELECT u.name AS 'Personel',
+              COUNT(*) AS 'Toplam Kayıt',
+              SUM(CASE WHEN cl.notes IS NOT NULL AND cl.notes != '' THEN 1 ELSE 0 END) AS 'Notlu Kayıt',
+              SUM(CASE WHEN cl.image IS NOT NULL AND cl.image != '' THEN 1 ELSE 0 END) AS 'Fotoğraflı Kayıt',
+              (COUNT(*) * 5 +
+               SUM(CASE WHEN cl.notes IS NOT NULL AND cl.notes != '' THEN 1 ELSE 0 END) * 1 +
+               SUM(CASE WHEN cl.image IS NOT NULL AND cl.image != '' THEN 1 ELSE 0 END) * 2) AS 'Toplam Puan'
+       FROM cleaning_logs cl
+       JOIN users u ON cl.user_id = u.id
+       WHERE DATE(cl.cleaned_at) >= ?
+       GROUP BY u.id, u.name
+       ORDER BY COUNT(*) DESC`,
+      [weekStartStr]
+    ),
+    dbQuery(
+      `SELECT u.name AS 'Personel',
+              r.name AS 'Oda',
+              cl.cleaned_at AS 'Tarih',
+              CASE WHEN cl.notes IS NOT NULL AND cl.notes != '' THEN cl.notes ELSE '-' END AS 'Not',
+              CASE WHEN cl.image IS NOT NULL AND cl.image != '' THEN 'Var' ELSE 'Yok' END AS 'Fotoğraf'
+       FROM cleaning_logs cl
+       LEFT JOIN users u ON cl.user_id = u.id
+       LEFT JOIN rooms r ON cl.room_id = r.id
+       ORDER BY cl.cleaned_at DESC`,
+      []
+    ),
+    dbQuery(
+      `SELECT name AS 'Ad Soyad',
+              email AS 'E-posta',
+              CASE WHEN role = 'admin' THEN 'Yönetici' ELSE 'Personel' END AS 'Rol',
+              CASE WHEN approval_status = 'approved' THEN 'Onaylı'
+                   WHEN approval_status = 'pending' THEN 'Beklemede'
+                   ELSE 'Reddedildi' END AS 'Durum',
+              employee_no AS 'Sicil No',
+              department AS 'Departman'
+       FROM users
+       ORDER BY role DESC, name`,
+      []
+    ),
+    dbQuery(
+      `SELECT r.name AS 'Oda',
+              r.description AS 'Açıklama',
+              COUNT(cl.id) AS 'Toplam Temizlik',
+              MAX(cl.cleaned_at) AS 'Son Temizlik'
+       FROM rooms r
+       LEFT JOIN cleaning_logs cl ON r.id = cl.room_id
+       GROUP BY r.id, r.name, r.description
+       ORDER BY COUNT(cl.id) DESC`,
+      []
+    ),
+  ])
+    .then(([kpiData, cleaningData, userData, roomStats]) => {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiData), 'Haftalık KPI');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cleaningData), 'Tüm Kayıtlar');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(userData), 'Personel');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(roomStats), 'Oda İstatistikleri');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const today = new Date().toISOString().split('T')[0];
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="temizlik_raporu_${today}.xlsx"`);
+      res.send(buffer);
+    })
+    .catch((err) => {
+      console.error('Export hatası:', err);
+      res.status(500).json({ message: 'Excel oluşturulamadı: ' + err.message });
+    });
 });
 
 // GET /api/admin/dashboard -> özet istatistikler
