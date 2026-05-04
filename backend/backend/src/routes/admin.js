@@ -274,4 +274,99 @@ router.delete('/users/:id', ensureAdmin, (req, res) => {
   });
 });
 
+// GET /api/admin/dashboard -> özet istatistikler
+router.get('/dashboard', ensureAdmin, (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 7);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  const result = {};
+
+  db.get(
+    `SELECT COUNT(*) as count FROM cleaning_logs WHERE DATE(cleaned_at) = ?`,
+    [today],
+    (err, row) => {
+      if (err) return res.status(500).json({ message: 'DB hatası' });
+      result.today_count = row.count;
+
+      db.get(
+        `SELECT COUNT(*) as count FROM scheduled_tasks WHERE status = 'pending'`,
+        [],
+        (err, row) => {
+          if (err) return res.status(500).json({ message: 'DB hatası' });
+          result.pending_tasks = row.count;
+
+          db.get(
+            `SELECT COUNT(DISTINCT user_id) as count FROM cleaning_logs WHERE DATE(cleaned_at) >= ?`,
+            [weekStartStr],
+            (err, row) => {
+              if (err) return res.status(500).json({ message: 'DB hatası' });
+              result.active_personnel = row.count;
+
+              db.get(
+                `SELECT COUNT(*) as count FROM cleaning_logs WHERE DATE(cleaned_at) >= ?`,
+                [weekStartStr],
+                (err, row) => {
+                  if (err) return res.status(500).json({ message: 'DB hatası' });
+                  result.weekly_total = row.count;
+
+                  db.all(
+                    `SELECT r.name as room_name, COUNT(*) as count
+                     FROM cleaning_logs cl
+                     JOIN rooms r ON cl.room_id = r.id
+                     WHERE DATE(cl.cleaned_at) >= ?
+                     GROUP BY r.name
+                     ORDER BY count DESC
+                     LIMIT 5`,
+                    [weekStartStr],
+                    (err, rows) => {
+                      if (err) return res.status(500).json({ message: 'DB hatası' });
+                      result.room_distribution = rows;
+
+                      db.all(
+                        `SELECT DATE(cleaned_at) as day, COUNT(*) as count
+                         FROM cleaning_logs
+                         WHERE DATE(cleaned_at) >= ?
+                         GROUP BY DATE(cleaned_at)
+                         ORDER BY day ASC`,
+                        [weekStartStr],
+                        (err, rows) => {
+                          if (err) return res.status(500).json({ message: 'DB hatası' });
+                          result.weekly_trend = rows;
+
+                          db.all(
+                            `SELECT u.name, COUNT(*) as total,
+                                    SUM(CASE WHEN cl.notes IS NOT NULL AND cl.notes != '' THEN 1 ELSE 0 END) as noted,
+                                    SUM(CASE WHEN cl.image IS NOT NULL AND cl.image != '' THEN 1 ELSE 0 END) as photo
+                             FROM cleaning_logs cl
+                             JOIN users u ON cl.user_id = u.id
+                             WHERE DATE(cl.cleaned_at) >= ?
+                             GROUP BY u.id, u.name
+                             ORDER BY total DESC
+                             LIMIT 3`,
+                            [weekStartStr],
+                            (err, rows) => {
+                              if (err) return res.status(500).json({ message: 'DB hatası' });
+                              result.top_personnel = rows.map((r) => ({
+                                name: r.name,
+                                score: r.total * 5 + r.noted * 1 + r.photo * 2,
+                              }));
+                              return res.json(result);
+                            }
+                          );
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;

@@ -189,6 +189,14 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _adminSections(BuildContext context) => [
         _sectionHeader('YÖNETİM'),
         MenuCard(
+          title: 'Dashboard',
+          icon: Icons.dashboard,
+          color: AppColors.adminAccent,
+          subtitle: 'Genel bakış ve istatistikler',
+          onTap: () => Navigator.pushNamed(context, '/admin-dashboard'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        MenuCard(
           title: 'Onay Bekleyen Kullanıcılar',
           icon: Icons.pending_actions,
           color: AppColors.adminAccent,
