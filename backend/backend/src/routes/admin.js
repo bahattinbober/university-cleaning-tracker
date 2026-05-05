@@ -582,6 +582,60 @@ router.get('/anomalies', ensureAdmin, async (req, res) => {
       });
     }
 
+    // KURAL 6: KRİTİK STOK — bitmek üzere olan malzemeler
+    const criticalStock = await dbAll(
+      `SELECT i.id, i.name, i.unit, i.current_amount, i.min_threshold,
+              (SELECT COALESCE(SUM(amount), 0)
+               FROM inventory_logs
+               WHERE inventory_id = i.id
+                 AND action = 'use'
+                 AND created_at >= datetime('now', '-7 days')) as used_7d,
+              (SELECT COUNT(DISTINCT DATE(created_at))
+               FROM inventory_logs
+               WHERE inventory_id = i.id
+                 AND action = 'use'
+                 AND created_at >= datetime('now', '-7 days')) as days_7d
+       FROM inventory i`
+    );
+
+    criticalStock.forEach((stock) => {
+      if (stock.current_amount <= stock.min_threshold) {
+        anomalies.push({
+          severity: 'high',
+          icon: 'inventory_2',
+          title: `${stock.name} kritik seviyede`,
+          description: `Stokta sadece ${stock.current_amount} ${stock.unit} kaldı (min: ${stock.min_threshold})`,
+          type: 'low_stock',
+          data: { inventory_id: stock.id },
+        });
+        return;
+      }
+
+      if (stock.used_7d > 0 && stock.days_7d > 0) {
+        const dailyAvg = stock.used_7d / stock.days_7d;
+        const daysRemaining = Math.floor(stock.current_amount / dailyAvg);
+        if (daysRemaining < 5) {
+          anomalies.push({
+            severity: 'high',
+            icon: 'schedule',
+            title: `${stock.name} ${daysRemaining} gün sonra bitecek`,
+            description: `Günlük ortalama: ${dailyAvg.toFixed(1)} ${stock.unit}, mevcut: ${stock.current_amount} ${stock.unit}`,
+            type: 'stock_running_out',
+            data: { inventory_id: stock.id },
+          });
+        } else if (daysRemaining < 10) {
+          anomalies.push({
+            severity: 'medium',
+            icon: 'schedule',
+            title: `${stock.name} 10 gün içinde bitebilir`,
+            description: `Günlük ortalama: ${dailyAvg.toFixed(1)} ${stock.unit}, ${daysRemaining} gün kaldı`,
+            type: 'stock_warning',
+            data: { inventory_id: stock.id },
+          });
+        }
+      }
+    });
+
     const severityOrder = { high: 0, medium: 1, info: 2 };
     anomalies.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 

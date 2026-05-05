@@ -5,7 +5,7 @@ const router = express.Router();
 
 // POST /api/cleaning veya /api/cleaning-logs -> temizlik kaydı ekle
 router.post('/', (req, res) => {
-  const { user_id, room_id, status, notes, image } = req.body;
+  const { user_id, room_id, status, notes, image, used_materials } = req.body;
   const userId = user_id || req.user.id; // body'den gelebilir, yoksa token kullan
 
   if (image && Buffer.byteLength(image, 'base64') > 1.5 * 1024 * 1024) {
@@ -33,6 +33,29 @@ router.post('/', (req, res) => {
       }
 
       const cleaningLogId = this.lastID;
+
+      // Kullanılan malzemeleri stoktan düş
+      if (Array.isArray(used_materials) && used_materials.length > 0) {
+        used_materials.forEach((mat) => {
+          const invId = Number(mat.inventory_id);
+          const amount = Number(mat.amount);
+          if (!invId || !amount || amount <= 0) return;
+
+          db.run(
+            `UPDATE inventory
+             SET current_amount = MAX(0, current_amount - ?),
+                 updated_at = datetime('now')
+             WHERE id = ?`,
+            [amount, invId]
+          );
+
+          db.run(
+            `INSERT INTO inventory_logs (inventory_id, user_id, action, amount, note)
+             VALUES (?, ?, 'use', ?, ?)`,
+            [invId, userId, amount, `Temizlik kaydı #${cleaningLogId}`]
+          );
+        });
+      }
 
       // Oluşan cleaning log için en yakın pending planlı görevi tamamlanmışa çevir.
       const matchSql = `

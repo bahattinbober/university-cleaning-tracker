@@ -612,6 +612,8 @@ class _AnomaliesCard extends StatelessWidget {
     'trending_up': Icons.trending_up,
     'trending_down': Icons.trending_down,
     'pending_actions': Icons.pending_actions,
+    'inventory_2': Icons.inventory_2,
+    'schedule': Icons.schedule,
   };
 
   Color _severityColor(String severity) {

@@ -312,6 +312,11 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
   // Backend sadece 'completed' kabul eder; seçim KPI gösterimi için UI mock.
   String _selectedStatus = 'completed';
 
+  List<Map<String, dynamic>> _availableMaterials = [];
+  final Map<int, TextEditingController> _materialControllers = {};
+  final Map<int, bool> _selectedMaterials = {};
+  bool _loadingMaterials = false;
+
   @override
   void initState() {
     super.initState();
@@ -321,6 +326,9 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
   @override
   void dispose() {
     notesController.dispose();
+    for (final c in _materialControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -335,6 +343,36 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
     });
 
     await _loadRoomName();
+    await _fetchMaterials();
+  }
+
+  Future<void> _fetchMaterials() async {
+    setState(() => _loadingMaterials = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final t = prefs.getString('token');
+      final response = await http.get(
+        Uri.parse('http://192.168.1.27:4000/api/inventory'),
+        headers: {'Authorization': 'Bearer $t'},
+      );
+      if (response.statusCode == 200 && mounted) {
+        final list = jsonDecode(response.body) as List;
+        final materials = list.cast<Map<String, dynamic>>();
+        setState(() {
+          _availableMaterials = materials;
+          for (final m in materials) {
+            final id = m['id'] as int;
+            _selectedMaterials[id] = false;
+            _materialControllers[id] = TextEditingController();
+          }
+          _loadingMaterials = false;
+        });
+      } else if (mounted) {
+        setState(() => _loadingMaterials = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMaterials = false);
+    }
   }
 
   Future<void> _loadRoomName() async {
@@ -407,6 +445,20 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
 
     try {
       final imageBase64 = await _imageToBase64();
+
+      final usedMaterials = <Map<String, dynamic>>[];
+      _selectedMaterials.forEach((id, isSelected) {
+        if (isSelected) {
+          final amount = double.tryParse(
+                _materialControllers[id]?.text ?? '0',
+              ) ??
+              0;
+          if (amount > 0) {
+            usedMaterials.add({'inventory_id': id, 'amount': amount});
+          }
+        }
+      });
+
       final response = await http.post(
         Uri.parse('http://192.168.1.27:4000/api/cleaning-logs'),
         headers: {
@@ -419,6 +471,7 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
           'status': 'completed', // Backend sadece 'completed' kabul eder
           'notes': notesController.text.trim(),
           'image': imageBase64,
+          'used_materials': usedMaterials,
         }),
       );
 
@@ -578,6 +631,79 @@ class _CleaningLogFormScreenState extends State<CleaningLogFormScreen> {
                     'Yapılan işler, dikkat edilmesi gereken noktalar...',
               ),
             ),
+            if (_loadingMaterials) ...[
+              const SizedBox(height: AppSpacing.md),
+              const Center(
+                child: SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ] else if (_availableMaterials.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Kullanılan Malzemeler (opsiyonel)',
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ..._availableMaterials.map((material) {
+                final id = material['id'] as int;
+                final isSelected = _selectedMaterials[id] ?? false;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: isSelected,
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedMaterials[id] = val ?? false;
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: Text(
+                            material['name']?.toString() ?? '-',
+                            style: AppTextStyles.body,
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          SizedBox(
+                            width: 80,
+                            child: TextField(
+                              controller: _materialControllers[id],
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: '0',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            material['unit']?.toString() ?? '',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
             const SizedBox(height: AppSpacing.xl),
             SizedBox(
               width: double.infinity,
