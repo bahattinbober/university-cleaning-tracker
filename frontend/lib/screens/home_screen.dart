@@ -197,6 +197,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
         MenuCard(
+          title: 'Stok Yönetimi',
+          icon: Icons.inventory_2,
+          color: AppColors.adminAccent,
+          subtitle: 'Malzeme takibi ve tahmin',
+          onTap: () => Navigator.pushNamed(context, '/inventory'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        MenuCard(
           title: 'Onay Bekleyen Kullanıcılar',
           icon: Icons.pending_actions,
           color: AppColors.adminAccent,

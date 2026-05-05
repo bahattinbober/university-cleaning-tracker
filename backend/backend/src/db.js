@@ -232,8 +232,37 @@ db.serialize(() => {
     }
   });
 
+  // INVENTORY TABLOSU
+  db.run(`
+    CREATE TABLE IF NOT EXISTS inventory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      current_amount REAL NOT NULL DEFAULT 0,
+      min_threshold REAL NOT NULL DEFAULT 0,
+      category TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // INVENTORY LOGS TABLOSU
+  db.run(`
+    CREATE TABLE IF NOT EXISTS inventory_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      inventory_id INTEGER NOT NULL,
+      user_id INTEGER,
+      action TEXT NOT NULL,
+      amount REAL NOT NULL,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (inventory_id) REFERENCES inventory(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
   console.log(
-    '✅ Tablolar oluşturuldu (users, locations, rooms, cleaning_logs, scheduled_tasks)'
+    '✅ Tablolar oluşturuldu (users, locations, rooms, cleaning_logs, scheduled_tasks, inventory, inventory_logs)'
   );
 
   // Varsayılan admin seed — yalnızca env'de her iki değişken de varsa çalışır
