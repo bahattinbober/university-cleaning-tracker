@@ -457,4 +457,139 @@ router.get('/dashboard', ensureAdmin, (req, res) => {
   );
 });
 
+// GET /api/admin/anomalies -> heuristik kural tabanlı anomali tespiti
+router.get('/anomalies', ensureAdmin, async (req, res) => {
+  try {
+    const anomalies = [];
+
+    const dbAll = (sql, params = []) =>
+      new Promise((resolve, reject) =>
+        db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)))
+      );
+
+    // KURAL 1: İNAKTİF PERSONEL — 3+ gündür kayıt yapmamış aktif personel
+    const inactiveUsers = await dbAll(
+      `SELECT u.id, u.name,
+              MAX(cl.cleaned_at) as last_cleaning,
+              CAST((julianday('now') - julianday(MAX(cl.cleaned_at))) AS INTEGER) as days_inactive
+       FROM users u
+       LEFT JOIN cleaning_logs cl ON u.id = cl.user_id
+       WHERE u.role = 'staff' AND u.approval_status = 'approved'
+       GROUP BY u.id, u.name
+       HAVING days_inactive >= 3 OR last_cleaning IS NULL
+       ORDER BY days_inactive ASC`
+    );
+
+    inactiveUsers.forEach((u) => {
+      const days = u.days_inactive;
+      anomalies.push({
+        severity: days === null || days >= 7 ? 'high' : 'medium',
+        icon: 'person_off',
+        title: `${u.name} ${days === null ? 'hiç kayıt yapmadı' : `${days} gündür kayıt yapmadı`}`,
+        description: u.last_cleaning
+          ? `Son kayıt: ${u.last_cleaning}`
+          : 'Sistemde hiç temizlik kaydı yok',
+        type: 'inactive_user',
+        data: { user_id: u.id },
+      });
+    });
+
+    // KURAL 2: ŞÜPHELİ HIZLI KAYIT — aynı oda+kullanıcı, 1 saatte >3 kayıt
+    const rapidLogs = await dbAll(
+      `SELECT u.name as user_name, r.name as room_name, COUNT(*) as count
+       FROM cleaning_logs cl
+       JOIN users u ON cl.user_id = u.id
+       JOIN rooms r ON cl.room_id = r.id
+       WHERE cl.cleaned_at >= datetime('now', '-1 hour')
+       GROUP BY cl.user_id, cl.room_id
+       HAVING COUNT(*) > 3`
+    );
+
+    rapidLogs.forEach((r) => {
+      anomalies.push({
+        severity: 'medium',
+        icon: 'speed',
+        title: `${r.user_name} - ${r.room_name}'a ${r.count} kayıt (1 saatte)`,
+        description: 'Şüpheli hızlı kayıt aktivitesi',
+        type: 'rapid_logs',
+      });
+    });
+
+    // KURAL 3: GECİKMİŞ GÖREV — scheduled_for geçti, hâlâ pending
+    const overdueTasks = await dbAll(
+      `SELECT st.id, st.title, st.scheduled_for, u.name as user_name
+       FROM scheduled_tasks st
+       LEFT JOIN users u ON st.assigned_user_id = u.id
+       WHERE st.status = 'pending'
+         AND datetime(st.scheduled_for) < datetime('now')
+       ORDER BY st.scheduled_for ASC
+       LIMIT 5`
+    );
+
+    overdueTasks.forEach((t) => {
+      anomalies.push({
+        severity: 'high',
+        icon: 'event_busy',
+        title: `Gecikmiş görev: ${t.title}`,
+        description: `${t.user_name || 'Atanmadı'} - Tarih: ${t.scheduled_for}`,
+        type: 'overdue_task',
+        data: { task_id: t.id },
+      });
+    });
+
+    // KURAL 4: HAFTALIK TREND — bu hafta vs geçen hafta %30+ sapma
+    const weekComparison = await dbAll(
+      `SELECT
+         (SELECT COUNT(*) FROM cleaning_logs
+          WHERE cleaned_at >= datetime('now', '-7 days')) as this_week,
+         (SELECT COUNT(*) FROM cleaning_logs
+          WHERE cleaned_at >= datetime('now', '-14 days')
+            AND cleaned_at < datetime('now', '-7 days')) as last_week`
+    );
+
+    if (weekComparison.length > 0) {
+      const { this_week, last_week } = weekComparison[0];
+      if (last_week > 0) {
+        const numChange = Math.round(((this_week - last_week) / last_week) * 100);
+        if (Math.abs(numChange) >= 30) {
+          anomalies.push({
+            severity: 'info',
+            icon: numChange > 0 ? 'trending_up' : 'trending_down',
+            title: `Bu hafta kayıt sayısı %${Math.abs(numChange)} ${numChange > 0 ? 'arttı' : 'azaldı'}`,
+            description: `Geçen hafta: ${last_week} kayıt, Bu hafta: ${this_week} kayıt`,
+            type: 'weekly_trend',
+          });
+        }
+      }
+    }
+
+    // KURAL 5: ONAY BEKLEYEN KULLANICILAR — users tablosunda created_at yok, sayı yeter
+    const pendingUsers = await dbAll(
+      `SELECT id, name, email
+       FROM users
+       WHERE approval_status = 'pending'
+       ORDER BY id ASC`
+    );
+
+    if (pendingUsers.length > 0) {
+      anomalies.push({
+        severity: 'medium',
+        icon: 'pending_actions',
+        title: `${pendingUsers.length} kullanıcı onay bekliyor`,
+        description: 'Yeni kayıt onayı verilmesi bekleniyor',
+        type: 'pending_approvals',
+        data: { count: pendingUsers.length },
+      });
+    }
+
+    const severityOrder = { high: 0, medium: 1, info: 2 };
+    anomalies.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+    res.json({ count: anomalies.length, anomalies });
+  } catch (err) {
+    console.error('Anomali endpoint hatası:', err);
+    res.status(500).json({ message: 'Anomali tespiti hatası: ' + err.message });
+  }
+});
+
 module.exports = router;

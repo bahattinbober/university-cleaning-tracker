@@ -20,6 +20,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isExporting = false;
   Map<String, dynamic>? _data;
   String? _errorMessage;
+  List<dynamic> _anomalies = [];
 
   @override
   void initState() {
@@ -63,6 +64,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _isLoading = false;
       });
     }
+    _fetchAnomalies();
+  }
+
+  Future<void> _fetchAnomalies() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null) return;
+
+      final response = await http.get(
+        Uri.parse('http://192.168.1.27:4000/api/admin/anomalies'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200 && mounted) {
+        final body = jsonDecode(response.body);
+        setState(() {
+          _anomalies = body['anomalies'] as List? ?? [];
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _exportExcel() async {
@@ -159,6 +181,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
                       _KpiGrid(data: _data!),
+                      const SizedBox(height: AppSpacing.md),
+                      _AnomaliesCard(anomalies: _anomalies),
                       const SizedBox(height: AppSpacing.md),
                       _RoomPieCard(data: _data!),
                       const SizedBox(height: AppSpacing.md),
@@ -568,6 +592,148 @@ class _TopPersonnelCard extends StatelessWidget {
                   ),
                 );
               }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Anomalies Card ────────────────────────────────────────────────────────
+
+class _AnomaliesCard extends StatelessWidget {
+  const _AnomaliesCard({required this.anomalies});
+  final List<dynamic> anomalies;
+
+  static const _icons = <String, IconData>{
+    'person_off': Icons.person_off,
+    'speed': Icons.speed,
+    'event_busy': Icons.event_busy,
+    'trending_up': Icons.trending_up,
+    'trending_down': Icons.trending_down,
+    'pending_actions': Icons.pending_actions,
+  };
+
+  Color _severityColor(String severity) {
+    switch (severity) {
+      case 'high':
+        return AppColors.error;
+      case 'medium':
+        return AppColors.warning;
+      default:
+        return AppColors.primary;
+    }
+  }
+
+  IconData _iconFor(String? iconName) =>
+      _icons[iconName] ?? Icons.info_outline;
+
+  @override
+  Widget build(BuildContext context) {
+    if (anomalies.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppColors.success, size: 22),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Tüm sistemler normal — uyarı yok',
+                  style: AppTextStyles.body,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber,
+                    color: AppColors.warning, size: 22),
+                const SizedBox(width: AppSpacing.sm),
+                Text('Akıllı Uyarılar', style: AppTextStyles.heading2),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${anomalies.length}',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(),
+            ...anomalies.take(5).map((a) {
+              final anomaly = a as Map<String, dynamic>;
+              final severity = anomaly['severity']?.toString() ?? 'info';
+              final color = _severityColor(severity);
+              final icon = _iconFor(anomaly['icon']?.toString());
+
+              return Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: color.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(icon, color: color, size: 20),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              anomaly['title']?.toString() ?? '',
+                              style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              anomaly['description']?.toString() ?? '',
+                              style: AppTextStyles.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            if (anomalies.length > 5)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Text(
+                  '+ ${anomalies.length - 5} daha',
+                  style: AppTextStyles.caption,
+                ),
+              ),
           ],
         ),
       ),
