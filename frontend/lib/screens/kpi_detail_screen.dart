@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/pdf_report_service.dart';
 import '../theme/app_theme.dart';
 
 class KpiDetailScreen extends StatefulWidget {
@@ -20,6 +23,8 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
 
   bool _trendLoading = true;
   List<Map<String, dynamic>> _trendData = [];
+
+  bool _generatingPdf = false;
 
   @override
   void initState() {
@@ -98,6 +103,30 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
 
   Future<void> _refresh() async {
     await Future.wait([_fetchKpi(), _fetchTrend()]);
+  }
+
+  Future<void> _downloadPdf() async {
+    if (_data == null || _generatingPdf) return;
+    setState(() => _generatingPdf = true);
+    try {
+      final bytes = await PdfReportService.generate(_data!);
+      if (!mounted) return;
+      await Printing.sharePdf(
+        bytes: Uint8List.fromList(bytes),
+        filename:
+            'performans_raporu_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF uretilemedi: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _generatingPdf = false);
+    }
   }
 
   Color _scoreColor(int score) {
@@ -264,6 +293,30 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               minimumSize: const Size.fromHeight(48),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          OutlinedButton.icon(
+                            onPressed: _generatingPdf
+                                ? null
+                                : _downloadPdf,
+                            icon: _generatingPdf
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.picture_as_pdf),
+                            label: Text(_generatingPdf
+                                ? 'PDF Hazırlanıyor...'
+                                : 'Performans Raporu (PDF) İndir'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize:
+                                  const Size.fromHeight(48),
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(
+                                  color: AppColors.primary),
                             ),
                           ),
                         ],
