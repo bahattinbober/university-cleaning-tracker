@@ -253,6 +253,12 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
         title: const Text('KPI Performans'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.school_outlined),
+            tooltip: 'KPI Metodolojisi',
+            onPressed: () =>
+                Navigator.pushNamed(context, '/kpi-methodology'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refresh,
           ),
