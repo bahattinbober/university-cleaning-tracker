@@ -276,6 +276,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
         title: const Text('Stok Yönetimi'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.pie_chart_outline),
+            tooltip: 'ABC Analizi',
+            onPressed: () => Navigator.pushNamed(context, '/abc-analysis'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchInventory,
           ),

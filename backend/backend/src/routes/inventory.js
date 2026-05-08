@@ -10,6 +10,88 @@ function ensureAdmin(req, res, next) {
   next();
 }
 
+// GET /api/inventory/abc-analysis -> ABC sınıflandırması (son 30 gün)
+router.get('/abc-analysis', (req, res) => {
+  const sql = `
+    SELECT
+      i.id,
+      i.name,
+      i.unit,
+      i.current_amount,
+      i.category,
+      COALESCE(SUM(CASE WHEN il.action = 'use'
+                       THEN il.amount ELSE 0 END), 0) as total_usage
+    FROM inventory i
+    LEFT JOIN inventory_logs il ON il.inventory_id = i.id
+      AND il.created_at >= datetime('now', '-30 days')
+    GROUP BY i.id
+    ORDER BY total_usage DESC
+  `;
+
+  db.all(sql, [], (err, items) => {
+    if (err) return res.status(500).json({ message: 'DB hatası' });
+
+    if (items.length === 0) {
+      return res.json({
+        items: [],
+        summary: {
+          total_items: 0,
+          total_usage: 0,
+          a_count: 0, b_count: 0, c_count: 0,
+          a_percentage: 0, b_percentage: 0, c_percentage: 0,
+        },
+        analysis_period: 'last_30_days',
+      });
+    }
+
+    const totalUsage = items.reduce((sum, item) => sum + Number(item.total_usage), 0);
+
+    let cumulative = 0;
+    const enriched = items.map((item) => {
+      const usage = Number(item.total_usage);
+      const percentage = totalUsage > 0 ? (usage / totalUsage) * 100 : 0;
+      cumulative += percentage;
+
+      let abc_class;
+      if (totalUsage === 0) abc_class = 'C';
+      else if (cumulative <= 80) abc_class = 'A';
+      else if (cumulative <= 95) abc_class = 'B';
+      else abc_class = 'C';
+
+      return {
+        ...item,
+        total_usage: usage,
+        percentage: parseFloat(percentage.toFixed(2)),
+        cumulative_percentage: parseFloat(cumulative.toFixed(2)),
+        abc_class,
+      };
+    });
+
+    const aItems = enriched.filter(i => i.abc_class === 'A');
+    const bItems = enriched.filter(i => i.abc_class === 'B');
+    const cItems = enriched.filter(i => i.abc_class === 'C');
+
+    const calcPct = (arr) => totalUsage > 0
+      ? parseFloat(((arr.reduce((s, i) => s + i.total_usage, 0) / totalUsage) * 100).toFixed(1))
+      : 0;
+
+    res.json({
+      items: enriched,
+      summary: {
+        total_items: items.length,
+        total_usage: totalUsage,
+        a_count: aItems.length,
+        b_count: bItems.length,
+        c_count: cItems.length,
+        a_percentage: calcPct(aItems),
+        b_percentage: calcPct(bItems),
+        c_percentage: calcPct(cItems),
+      },
+      analysis_period: 'last_30_days',
+    });
+  });
+});
+
 // GET /api/inventory -> tüm malzemeler + tahmin
 router.get('/', (req, res) => {
   db.all(`SELECT * FROM inventory ORDER BY name ASC`, [], (err, items) => {

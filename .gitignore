@@ -25,3 +25,10 @@ backend/backend/.env.test
 
 # Dev/test scripts
 backend/backend/add_test_data.js
+
+# Dev/test scripts (manual data seeding)
+backend/backend/add_test_data.js
+backend/backend/add_inventory_data.js
+backend/backend/add_inventory_usage.js
+backend/backend/fix_inventory.js
+backend/backend/fix_and_seed.js
