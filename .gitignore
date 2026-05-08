@@ -22,3 +22,6 @@ backend/backend/coverage/
 
 # Test env
 backend/backend/.env.test
+
+# Dev/test scripts
+backend/backend/add_test_data.js

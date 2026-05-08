@@ -283,6 +283,8 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
                           const SizedBox(height: AppSpacing.md),
                           _buildBenchmark(),
                           const SizedBox(height: AppSpacing.md),
+                          _buildStatisticalBenchmark(),
+                          const SizedBox(height: AppSpacing.md),
                           _buildTargetCard(),
                           const SizedBox(height: AppSpacing.md),
                           _buildTrendCard(),
@@ -1047,6 +1049,171 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatisticalBenchmark() {
+    final stats =
+        _data!['benchmark_stats'] as Map<String, dynamic>?;
+    if (stats == null) return const SizedBox.shrink();
+
+    final zScore = stats['z_score'];
+    final percentile = stats['percentile'] as int?;
+    final rank = stats['rank'] as int?;
+    final totalPersonnel = stats['total_personnel'] as int? ?? 0;
+    final interpretation =
+        stats['interpretation'] as String? ?? '';
+
+    if (zScore == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              const Icon(Icons.bar_chart,
+                  color: AppColors.textSecondary, size: 28),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  'İstatistiksel analiz için yeterli veri yok '
+                  '(en az 2 aktif personel gerekli)',
+                  style: AppTextStyles.caption,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final zNum = (zScore as num).toDouble();
+    final color = zNum >= 1
+        ? AppColors.success
+        : zNum >= -0.5
+            ? AppColors.primary
+            : zNum >= -1
+                ? AppColors.warning
+                : AppColors.error;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.analytics_outlined, color: color, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Text('İstatistiksel Konum',
+                    style: AppTextStyles.heading2),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '$totalPersonnel aktif personel arasındaki yeriniz',
+              style: AppTextStyles.caption,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _statBox(
+                    label: 'Z-Skor',
+                    value: zNum >= 0 ? '+$zScore' : '$zScore',
+                    subtitle: 'standart sapma',
+                    color: color,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _statBox(
+                    label: 'Persentil',
+                    value: '%${percentile ?? '-'}',
+                    subtitle: 'üst dilim',
+                    color: color,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _statBox(
+                    label: 'Sıralama',
+                    value:
+                        '${rank ?? '-'} / $totalPersonnel',
+                    subtitle: 'kişi arasında',
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border(
+                    left: BorderSide(color: color, width: 3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.insights, color: color, size: 18),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      interpretation,
+                      style: AppTextStyles.body
+                          .copyWith(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statBox({
+    required String label,
+    required String value,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            subtitle,
+            style: AppTextStyles.caption.copyWith(fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

@@ -159,6 +159,45 @@ async function calculateAndReturn(userId, res) {
     );
     const avgTotal = Math.max(Number(systemAvg?.avg_total || 0), 10);
 
+    // ── İSTATİSTİKSEL DAĞILIM ───────────────────────────────────────────────
+
+    const distributionRows = await dbAll(
+      `SELECT user_id, COUNT(*) as total
+       FROM cleaning_logs cl
+       INNER JOIN users u ON u.id = cl.user_id
+       WHERE u.role = 'staff'
+         AND u.approval_status = 'approved'
+         AND cl.cleaned_at >= datetime('now', '-7 days')
+       GROUP BY user_id`
+    );
+
+    let zScore = null;
+    let percentile = null;
+    let rank = null;
+    let totalPersonnel = 0;
+    let stdDev = 0;
+
+    if (distributionRows.length >= 2) {
+      const values = distributionRows.map((r) => Number(r.total));
+      totalPersonnel = values.length;
+
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance =
+        values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) /
+        values.length;
+      stdDev = Math.sqrt(variance);
+
+      if (stdDev > 0) {
+        zScore = parseFloat(((total - mean) / stdDev).toFixed(2));
+      }
+
+      const lowerCount = values.filter((v) => v < total).length;
+      percentile = Math.round((lowerCount / values.length) * 100);
+
+      const sorted = [...values].sort((a, b) => b - a);
+      rank = sorted.findIndex((v) => v === total) + 1;
+    }
+
     // Kişisel hedef
     const targetRow = await dbGet(
       'SELECT target_value FROM kpi_targets WHERE user_id = ?',
@@ -421,6 +460,15 @@ async function calculateAndReturn(userId, res) {
         { label: 'Geç (ceza)',  count: late,    points: -late   * 2, formula: `-${late} × 2`   },
       ],
 
+      benchmark_stats: {
+        z_score:          zScore,
+        percentile,
+        rank,
+        total_personnel:  totalPersonnel,
+        std_dev:          parseFloat(stdDev.toFixed(2)),
+        interpretation:   _interpretZScore(zScore),
+      },
+
       achievements: {
         items:           achievements,
         completed_count: completedCount,
@@ -432,6 +480,17 @@ async function calculateAndReturn(userId, res) {
     console.error('KPI hesaplama hatası:', err);
     res.status(500).json({ message: 'KPI hesaplanamadı: ' + err.message });
   }
+}
+
+function _interpretZScore(z) {
+  if (z === null) return 'Yetersiz veri (en az 2 personel gerekli)';
+  if (z >= 2)    return 'Mükemmel: Sistemin en üst diliminde yer alıyorsunuz';
+  if (z >= 1)    return 'Çok İyi: Ortalamanın belirgin üzerindesiniz';
+  if (z >= 0.5)  return 'İyi: Ortalamanın hafif üzerindesiniz';
+  if (z >= -0.5) return 'Ortalama: Sistem ortalamasına yakınsınız';
+  if (z >= -1)   return 'Geliştirilebilir: Ortalamanın hafif altındasınız';
+  if (z >= -2)   return 'Düşük: Ortalamanın belirgin altındasınız';
+  return 'Acil İyileştirme: Sistem dağılımının alt diliminde';
 }
 
 module.exports = router;
