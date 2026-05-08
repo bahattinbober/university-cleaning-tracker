@@ -252,6 +252,10 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
                           const SizedBox(height: AppSpacing.md),
                           _buildTrendCard(),
                           const SizedBox(height: AppSpacing.md),
+                          _buildRecommendationsCard(),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildAchievementsCard(),
+                          const SizedBox(height: AppSpacing.md),
                           ElevatedButton.icon(
                             onPressed: _showBreakdownDialog,
                             icon: const Icon(Icons.search),
@@ -750,6 +754,240 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  IconData _iconFromName(String name) {
+    switch (name) {
+      case 'trending_up':
+        return Icons.trending_up;
+      case 'photo_camera':
+        return Icons.photo_camera;
+      case 'description':
+        return Icons.description;
+      case 'schedule':
+        return Icons.schedule;
+      case 'flag':
+        return Icons.flag;
+      case 'check_circle':
+        return Icons.check_circle;
+      case 'bolt':
+        return Icons.bolt;
+      case 'workspace_premium':
+        return Icons.workspace_premium;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  Widget _buildRecommendationsCard() {
+    final recommendations =
+        (_data!['recommendations'] as List?) ?? [];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.lightbulb_outline,
+                    color: AppColors.primary, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Text('Gelişim Önerileri',
+                    style: AppTextStyles.heading2),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Karar destek sistemi tabanlı kişisel öneriler',
+              style: AppTextStyles.caption,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ...recommendations.map((r) {
+              final rec = r as Map<String, dynamic>;
+              final priority = rec['priority'] as String? ?? 'info';
+              final color = priority == 'high'
+                  ? AppColors.error
+                  : priority == 'medium'
+                      ? AppColors.warning
+                      : AppColors.success;
+              final iconData =
+                  _iconFromName(rec['icon'] as String? ?? '');
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border(
+                    left: BorderSide(color: color, width: 3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(iconData, color: color, size: 22),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            rec['title'] as String? ?? '',
+                            style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            rec['message'] as String? ?? '',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAchievementsCard() {
+    final ach = _data!['achievements'] as Map<String, dynamic>?;
+    if (ach == null) return const SizedBox.shrink();
+
+    final items =
+        (ach['items'] as List).cast<Map<String, dynamic>>();
+    final completedCount = ach['completed_count'] as int? ?? 0;
+    final totalCount = ach['total_count'] as int? ?? 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.emoji_events_outlined,
+                    color: AppColors.primary, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Text('Başarı Göstergeleri',
+                    style: AppTextStyles.heading2),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color:
+                        AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$completedCount/$totalCount',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Performans tabanlı kademeli başarı izleme',
+              style: AppTextStyles.caption,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 2.2,
+                crossAxisSpacing: AppSpacing.sm,
+                mainAxisSpacing: AppSpacing.sm,
+              ),
+              itemCount: items.length,
+              itemBuilder: (ctx, i) {
+                final item = items[i];
+                final completed = item['completed'] as bool? ?? false;
+                final progress = item['progress'] as int? ?? 0;
+                final color = completed
+                    ? AppColors.primary
+                    : AppColors.textSecondary;
+
+                return Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: completed
+                        ? AppColors.primary.withValues(alpha: 0.06)
+                        : Colors.grey.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: completed
+                          ? AppColors.primary.withValues(alpha: 0.3)
+                          : Colors.grey.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _iconFromName(
+                            item['icon'] as String? ?? ''),
+                        color: color,
+                        size: 28,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              item['name'] as String? ?? '',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: completed
+                                    ? Colors.black87
+                                    : Colors.grey[600],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              completed
+                                  ? 'Tamamlandı'
+                                  : '%$progress',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: color,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

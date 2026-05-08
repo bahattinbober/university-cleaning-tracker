@@ -218,6 +218,171 @@ async function calculateAndReturn(userId, res) {
     const legacyScore = total * 5 + noted * 1 + photo * 2 + on_time * 4 - late * 2;
     const legacyMax   = total * (5 + 1 + 2 + 4);
 
+    // ── BAŞARI GÖSTERGELERİ ─────────────────────────────────────────────────
+
+    const dailyMaxRow = await dbGet(
+      `SELECT MAX(daily_count) as max_daily FROM (
+         SELECT COUNT(*) as daily_count
+         FROM cleaning_logs
+         WHERE user_id = ?
+         GROUP BY DATE(cleaned_at)
+       )`,
+      [userId]
+    );
+    const maxDaily = Number(dailyMaxRow?.max_daily || 0);
+    const consecutiveOnTime = (late === 0 && total >= 7);
+
+    const achievements = [
+      {
+        id: 'first_record',
+        name: 'Sisteme İlk Katkı',
+        description: 'İlk temizlik kaydını tamamladınız',
+        icon: 'check_circle',
+        category: 'Başlangıç',
+        completed: total >= 1,
+        progress: Math.min(100, total * 100),
+      },
+      {
+        id: 'goal_achieved',
+        name: 'Hedefe Yöneliş',
+        description: 'Yöneticinin atadığı haftalık hedefi tutturdunuz',
+        icon: 'flag',
+        category: 'Başlangıç',
+        completed: targetCompletion !== null && targetCompletion >= 100,
+        progress: targetCompletion ?? 0,
+      },
+      {
+        id: 'active_personnel',
+        name: 'Aktif Personel',
+        description: 'Tek günde 5 veya daha fazla kayıt tamamlandı',
+        icon: 'bolt',
+        category: 'Verimlilik',
+        completed: maxDaily >= 5,
+        progress: Math.min(100, Math.round((maxDaily / 5) * 100)),
+      },
+      {
+        id: 'above_average',
+        name: 'Üst Performans',
+        description: 'Sistem ortalamasının üzerinde kayıt sayısı',
+        icon: 'trending_up',
+        category: 'Verimlilik',
+        completed: total > avgTotal,
+        progress: Math.min(100, Math.round((total / avgTotal) * 100)),
+      },
+      {
+        id: 'visual_documentation',
+        name: 'Görsel Belgelendirme',
+        description: '5 veya daha fazla kayıt fotoğrafla belgelendi',
+        icon: 'photo_camera',
+        category: 'Kalite',
+        completed: photo >= 5,
+        progress: Math.min(100, Math.round((photo / 5) * 100)),
+      },
+      {
+        id: 'detailed_reporting',
+        name: 'Detaylı Raporlama',
+        description: '5 veya daha fazla kayda not eklendi',
+        icon: 'description',
+        category: 'Kalite',
+        completed: noted >= 5,
+        progress: Math.min(100, Math.round((noted / 5) * 100)),
+      },
+      {
+        id: 'time_discipline',
+        name: 'Zamanlama Disiplini',
+        description: 'Hiç gecikme olmadan 7+ kayıt tamamlandı',
+        icon: 'schedule',
+        category: 'Süreklilik',
+        completed: consecutiveOnTime,
+        progress: late === 0 ? Math.min(100, Math.round((total / 7) * 100)) : 0,
+      },
+      {
+        id: 'perfect_week',
+        name: 'Mükemmel Performans Haftası',
+        description: 'Haftalık hedef %100 oranında tamamlandı',
+        icon: 'workspace_premium',
+        category: 'Süreklilik',
+        completed: targetCompletion !== null && targetCompletion >= 100,
+        progress: targetCompletion ?? 0,
+      },
+    ];
+
+    const completedCount = achievements.filter((a) => a.completed).length;
+
+    // ── GELİŞİM ÖNERİLERİ ───────────────────────────────────────────────────
+
+    const allRecommendations = [];
+
+    if (productivity < 50) {
+      const gap = Math.max(0, Math.round(avgTotal) - total);
+      allRecommendations.push({
+        priority: 'high',
+        category: 'Verimlilik',
+        icon: 'trending_up',
+        title: 'Verimlilik bileşeniniz iyileştirilmeli',
+        message: `Kayıt sayınız sistem ortalamasının altında. Haftalık ${gap > 0 ? gap : 5} kayıt daha eklemek bu açığı kapatabilir.`,
+      });
+    }
+
+    if (total > 0 && (photo / total) < 0.5) {
+      const photoPct = Math.round((photo / total) * 100);
+      allRecommendations.push({
+        priority: 'medium',
+        category: 'Kalite',
+        icon: 'photo_camera',
+        title: 'Görsel belgelendirme oranı düşük',
+        message: `Kayıtlarınızın %${photoPct}'i fotoğraflı. Görsel belge eklemek Kalite bileşenini doğrudan iyileştirir.`,
+      });
+    }
+
+    if (total > 0 && (noted / total) < 0.5) {
+      const notePct = Math.round((noted / total) * 100);
+      allRecommendations.push({
+        priority: 'medium',
+        category: 'Kalite',
+        icon: 'description',
+        title: 'Not ekleme oranı düşük',
+        message: `Kayıtlarınızın %${notePct}'i not içeriyor. Detaylı not ekleme raporlama kalitesini artırır.`,
+      });
+    }
+
+    if (late > 0 && total > 0 && (late / total) > 0.2) {
+      const latePct = Math.round((late / total) * 100);
+      allRecommendations.push({
+        priority: 'high',
+        category: 'Zamanlama',
+        icon: 'schedule',
+        title: 'Gecikme oranı dikkat gerektiriyor',
+        message: `Kayıtlarınızın %${latePct}'i geç tamamlanmış. Görevleri planlanan zamanda tamamlamak Zamanlama skorunu iyileştirir.`,
+      });
+    }
+
+    if (target && targetCompletion !== null && targetCompletion < 50) {
+      const remaining = target - total;
+      allRecommendations.push({
+        priority: 'high',
+        category: 'Hedef',
+        icon: 'flag',
+        title: 'Haftalık hedeften uzaktasınız',
+        message: `Hedefinize ulaşmak için ${remaining} kayıt daha gerekli. Günlük ${Math.ceil(remaining / 7)} kayıt yeterli olacaktır.`,
+      });
+    }
+
+    if (allRecommendations.length === 0) {
+      allRecommendations.push({
+        priority: 'info',
+        category: 'Genel',
+        icon: 'check_circle',
+        title: 'Performansınız tüm bileşenlerde güçlü',
+        message: 'Mevcut çalışma temponuzu sürdürdüğünüz takdirde Üstün Performans seviyesine yaklaşmanız beklenmektedir.',
+      });
+    }
+
+    const priorityOrder = { high: 0, medium: 1, info: 2 };
+    const recommendations = allRecommendations
+      .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+      .slice(0, 2);
+
     res.json({
       user:   { id: user.id, name: user.name, email: user.email },
       period: 'last_7_days',
@@ -255,6 +420,13 @@ async function calculateAndReturn(userId, res) {
         { label: 'Zamanında',   count: on_time, points: on_time * 4, formula: `${on_time} × 4` },
         { label: 'Geç (ceza)',  count: late,    points: -late   * 2, formula: `-${late} × 2`   },
       ],
+
+      achievements: {
+        items:           achievements,
+        completed_count: completedCount,
+        total_count:     achievements.length,
+      },
+      recommendations,
     });
   } catch (err) {
     console.error('KPI hesaplama hatası:', err);
