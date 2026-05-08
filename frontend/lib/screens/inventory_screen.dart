@@ -304,6 +304,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         title: const Text('Stok Yonetimi'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.school_outlined),
+            tooltip: 'Envanter Metodolojisi',
+            onPressed: () =>
+                Navigator.pushNamed(context, '/inventory-methodology'),
+          ),
+          IconButton(
             icon: const Icon(Icons.pie_chart_outline),
             tooltip: 'ABC Analizi',
             onPressed: () => Navigator.pushNamed(context, '/abc-analysis'),
