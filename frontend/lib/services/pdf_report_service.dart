@@ -575,4 +575,559 @@ class PdfReportService {
       ],
     );
   }
+
+  // ── Envanter PDF ─────────────────────────────────────────────────────────
+
+  static Future<void> generateInventoryReport({
+    required List<Map<String, dynamic>> inventoryItems,
+    required Map<String, dynamic> abcData,
+  }) async {
+    final pdf = pw.Document();
+
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+    final logoBytes =
+        await rootBundle.load('assets/images/pau-logo.png');
+    final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+
+    final now = DateTime.now();
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
+
+    final normalCount = inventoryItems
+        .where((i) => i['alert_level'] == 'normal')
+        .length;
+    final reorderCount = inventoryItems
+        .where((i) => i['alert_level'] == 'reorder')
+        .length;
+    final criticalCount = inventoryItems
+        .where((i) =>
+            i['alert_level'] == 'critical' ||
+            i['alert_level'] == 'depleted')
+        .length;
+    final orderItems = inventoryItems
+        .where((i) =>
+            i['alert_level'] == 'reorder' ||
+            i['alert_level'] == 'critical' ||
+            i['alert_level'] == 'depleted')
+        .toList();
+    final abcItems =
+        (abcData['items'] as List).cast<Map<String, dynamic>>();
+    final abcSummary = abcData['summary'] as Map<String, dynamic>;
+
+    final theme = pw.ThemeData.withFont(base: font, bold: fontBold);
+
+    // ─── SAYFA 1 ───────────────────────────────────────────────────────────
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        theme: theme,
+        build: (pw.Context ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // Başlık + Logo
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                    width: 60,
+                    height: 60,
+                    child: pw.Image(logoImage)),
+                pw.SizedBox(width: 15),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Stok Envanter Raporu',
+                        style: pw.TextStyle(
+                          fontSize: 22,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(
+                        'Pamukkale Universitesi - Bilgisayar Muhendisligi',
+                        style: const pw.TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Tarih: $dateStr',
+                        style: const pw.TextStyle(fontSize: 10)),
+                    pw.Text('Surum: 1.0',
+                        style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+              ],
+            ),
+            pw.Divider(thickness: 1.5, color: PdfColors.blue700),
+            pw.SizedBox(height: 15),
+
+            // Özet
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(6)),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Genel Ozet',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Row(
+                    children: [
+                      _invSummaryBox('Toplam',
+                          '${inventoryItems.length}', PdfColors.blue700),
+                      pw.SizedBox(width: 8),
+                      _invSummaryBox(
+                          'Normal', '$normalCount', PdfColors.green700),
+                      pw.SizedBox(width: 8),
+                      _invSummaryBox('Siparis', '$reorderCount',
+                          PdfColors.orange700),
+                      pw.SizedBox(width: 8),
+                      _invSummaryBox(
+                          'Kritik', '$criticalCount', PdfColors.red700),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 15),
+
+            // ABC başlık
+            pw.Text(
+              'ABC Analizi (Pareto)',
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue800,
+              ),
+            ),
+            pw.Text(
+              'Son 30 gun kullanim hacmine gore siniflandirma',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.SizedBox(height: 8),
+
+            // ABC kutuları
+            pw.Row(
+              children: [
+                _invAbcBox(
+                    'A',
+                    '${abcSummary['a_count']} kalem',
+                    '%${abcSummary['a_percentage']}',
+                    PdfColors.red700),
+                pw.SizedBox(width: 8),
+                _invAbcBox(
+                    'B',
+                    '${abcSummary['b_count']} kalem',
+                    '%${abcSummary['b_percentage']}',
+                    PdfColors.orange700),
+                pw.SizedBox(width: 8),
+                _invAbcBox(
+                    'C',
+                    '${abcSummary['c_count']} kalem',
+                    '%${abcSummary['c_percentage']}',
+                    PdfColors.green700),
+              ],
+            ),
+            pw.SizedBox(height: 12),
+
+            // ABC tablosu (top 10)
+            pw.Text(
+              'En Cok Kullanilan 10 Kalem',
+              style: pw.TextStyle(
+                  fontSize: 12, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 4),
+            _invAbcTable(abcItems.take(10).toList()),
+          ],
+        ),
+      ),
+    );
+
+    // ─── SAYFA 2 ───────────────────────────────────────────────────────────
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        theme: theme,
+        build: (pw.Context ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Stok Envanter Raporu - Sayfa 2',
+                  style: pw.TextStyle(
+                      fontSize: 12, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(dateStr,
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
+            ),
+            pw.Divider(),
+            pw.SizedBox(height: 10),
+
+            // Sipariş önerileri (varsa)
+            if (orderItems.isNotEmpty) ...[
+              pw.Text(
+                'Siparis Onerileri (Wilson EOQ)',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.orange800,
+                ),
+              ),
+              pw.SizedBox(height: 6),
+              _invOrderTable(orderItems),
+              pw.SizedBox(height: 15),
+            ],
+
+            // Tüm stok tablosu
+            pw.Text(
+              'Tum Stok Kalemleri',
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue800,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            _invAllStockTable(inventoryItems),
+            pw.Spacer(),
+
+            // Akademik referanslar
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blue50,
+                borderRadius:
+                    const pw.BorderRadius.all(pw.Radius.circular(4)),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Akademik Dayanaklar',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    '- Pareto, V. (1906) - ABC Siniflandirmasi\n'
+                    '- Wilson, R. H. (1934) - Reorder Point Modeli\n'
+                    '- ISO 9001:2015 - Envanter Yonetim Standartlari',
+                    style: const pw.TextStyle(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 10),
+
+            // İmza
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Container(
+                        width: 150, height: 1, color: PdfColors.grey),
+                    pw.SizedBox(height: 3),
+                    pw.Text('Hazirlayan',
+                        style: const pw.TextStyle(fontSize: 9)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Container(
+                        width: 150, height: 1, color: PdfColors.grey),
+                    pw.SizedBox(height: 3),
+                    pw.Text('Onaylayan',
+                        style: const pw.TextStyle(fontSize: 9)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'stok-envanter-raporu-$dateStr.pdf',
+    );
+  }
+
+  // ── Envanter PDF Helpers ──────────────────────────────────────────────────
+
+  static pw.Widget _invSummaryBox(
+      String label, String value, PdfColor color) {
+    return pw.Expanded(
+      child: pw.Container(
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          color: PdfColors.white,
+          borderRadius:
+              const pw.BorderRadius.all(pw.Radius.circular(4)),
+          border: pw.Border.all(color: color, width: 1.5),
+        ),
+        child: pw.Column(
+          children: [
+            pw.Text(
+              value,
+              style: pw.TextStyle(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+                color: color,
+              ),
+            ),
+            pw.Text(label, style: const pw.TextStyle(fontSize: 8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static pw.Widget _invAbcBox(
+      String cls, String count, String pct, PdfColor color) {
+    return pw.Expanded(
+      child: pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          color: PdfColors.grey100,
+          border: pw.Border(
+            left: pw.BorderSide(color: color, width: 3),
+          ),
+        ),
+        child: pw.Row(
+          children: [
+            pw.Container(
+              width: 30,
+              height: 30,
+              decoration: pw.BoxDecoration(
+                color: color,
+                borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(4)),
+              ),
+              alignment: pw.Alignment.center,
+              child: pw.Text(
+                cls,
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            pw.SizedBox(width: 8),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  count,
+                  style: pw.TextStyle(
+                      fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(pct,
+                    style: pw.TextStyle(fontSize: 10, color: color)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static pw.Widget _invAbcTable(List<Map<String, dynamic>> items) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      columnWidths: const {
+        0: pw.FixedColumnWidth(30),
+        1: pw.FlexColumnWidth(3),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FixedColumnWidth(50),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: [
+            _invTh('Sinif'),
+            _invTh('Urun'),
+            _invTh('Kullanim'),
+            _invTh('Yuzde'),
+          ],
+        ),
+        ...items.map((item) {
+          final cls = item['abc_class']?.toString() ?? 'C';
+          PdfColor color = PdfColors.green700;
+          if (cls == 'A') color = PdfColors.red700;
+          if (cls == 'B') color = PdfColors.orange700;
+          return pw.TableRow(
+            children: [
+              pw.Container(
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(4),
+                color: color,
+                child: pw.Text(
+                  cls,
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+              _invTd(item['name']?.toString() ?? '-'),
+              _invTd(
+                  '${item['total_usage']} ${item['unit'] ?? ''}'),
+              _invTd('%${item['percentage']}'),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _invOrderTable(List<Map<String, dynamic>> items) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(3),
+        1: pw.FlexColumnWidth(2),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration:
+              const pw.BoxDecoration(color: PdfColors.orange100),
+          children: [
+            _invTh('Urun'),
+            _invTh('Mevcut'),
+            _invTh('ROP'),
+            _invTh('Onerilen'),
+          ],
+        ),
+        ...items.map(
+          (item) => pw.TableRow(
+            children: [
+              _invTd(item['name']?.toString() ?? '-'),
+              _invTd(
+                  '${item['current_amount']} ${item['unit'] ?? ''}'),
+              _invTd(
+                  '${item['reorder_point'] ?? '-'} ${item['unit'] ?? ''}'),
+              _invTd(
+                  '${item['suggested_order'] ?? '-'} ${item['unit'] ?? ''}'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _invAllStockTable(
+      List<Map<String, dynamic>> items) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(3),
+        1: pw.FlexColumnWidth(2),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration:
+              const pw.BoxDecoration(color: PdfColors.blue100),
+          children: [
+            _invTh('Urun'),
+            _invTh('Mevcut'),
+            _invTh('Min'),
+            _invTh('Durum'),
+          ],
+        ),
+        ...items.map((item) {
+          final lvl = item['alert_level']?.toString() ?? 'normal';
+          String label = 'Normal';
+          PdfColor color = PdfColors.green700;
+          if (lvl == 'depleted') {
+            label = 'Tukendi';
+            color = PdfColors.grey700;
+          } else if (lvl == 'critical') {
+            label = 'Kritik';
+            color = PdfColors.red700;
+          } else if (lvl == 'reorder') {
+            label = 'Siparis';
+            color = PdfColors.orange700;
+          }
+          return pw.TableRow(
+            children: [
+              _invTd(item['name']?.toString() ?? '-'),
+              _invTd(
+                  '${item['current_amount']} ${item['unit'] ?? ''}'),
+              _invTd(
+                  '${item['min_threshold']} ${item['unit'] ?? ''}'),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(3),
+                alignment: pw.Alignment.center,
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 2),
+                  decoration: pw.BoxDecoration(
+                    color: color,
+                    borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(3)),
+                  ),
+                  child: pw.Text(
+                    label,
+                    style: pw.TextStyle(
+                      color: PdfColors.white,
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _invTh(String text) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(4),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+            fontSize: 9, fontWeight: pw.FontWeight.bold),
+      ),
+    );
+  }
+
+  static pw.Widget _invTd(String text) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(4),
+      child:
+          pw.Text(text, style: const pw.TextStyle(fontSize: 9)),
+    );
+  }
 }

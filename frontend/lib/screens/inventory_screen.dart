@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/pdf_report_service.dart';
 import '../theme/app_theme.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -27,6 +28,49 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final prefs = await SharedPreferences.getInstance();
     _userRole = prefs.getString('userRole');
     await _fetchInventory();
+  }
+
+  Future<void> _generatePdfReport() async {
+    if (_items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Stok listesi bos, once yukleme yapin')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('PDF olusturuluyor...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final abcResponse = await http.get(
+        Uri.parse('http://192.168.1.27:4000/api/inventory/abc-analysis'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (abcResponse.statusCode != 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ABC verisi alinamadi')),
+          );
+        }
+        return;
+      }
+      final abcData =
+          jsonDecode(abcResponse.body) as Map<String, dynamic>;
+      await PdfReportService.generateInventoryReport(
+        inventoryItems: _items,
+        abcData: abcData,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _fetchInventory() async {
@@ -303,6 +347,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       appBar: AppBar(
         title: const Text('Stok Yonetimi'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'PDF Rapor',
+            onPressed: _generatePdfReport,
+          ),
           IconButton(
             icon: const Icon(Icons.school_outlined),
             tooltip: 'Envanter Metodolojisi',
