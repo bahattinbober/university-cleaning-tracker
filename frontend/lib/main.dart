@@ -16,6 +16,7 @@ import 'screens/change_password_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/inventory_screen.dart';
+import 'screens/kpi_detail_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -47,6 +48,7 @@ class MyApp extends StatelessWidget {
         "/profile": (context) => const ProfileScreen(),
         "/admin-dashboard": (context) => const AdminDashboardScreen(),
         "/inventory": (context) => const InventoryScreen(),
+        "/kpi-detail": (context) => const KpiDetailScreen(),
       },
 
       theme: AppTheme.lightTheme,

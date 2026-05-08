@@ -285,6 +285,14 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () =>
               Navigator.pushNamed(context, '/my-scheduled-tasks'),
         ),
+        const SizedBox(height: AppSpacing.sm),
+        MenuCard(
+          title: 'Performansım',
+          icon: Icons.analytics,
+          color: AppColors.primary,
+          subtitle: 'Detaylı KPI raporu',
+          onTap: () => Navigator.pushNamed(context, '/kpi-detail'),
+        ),
       ];
 
   Widget _sectionHeader(String label) => Padding(

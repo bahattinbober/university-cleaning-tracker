@@ -11,6 +11,7 @@ const cleaningRoutes = require('./routes/cleaning');
 const adminRoutes = require('./routes/admin');
 const tasksRoutes = require('./routes/tasks');
 const inventoryRoutes = require('./routes/inventory');
+const kpiRoutes = require('./routes/kpi');
 const authMiddleware = require('./middleware/authMiddleware');
 const { generalLimiter } = require('./middleware/rateLimiters');
 
@@ -81,6 +82,7 @@ app.use('/api/cleaning-logs', authMiddleware, cleaningRoutes);
 app.use('/api/admin', authMiddleware, adminRoutes);
 app.use('/api/tasks', authMiddleware, tasksRoutes);
 app.use('/api/inventory', authMiddleware, inventoryRoutes);
+app.use('/api/kpi', authMiddleware, kpiRoutes);
 
 const PORT = process.env.PORT || 4000;
 if (require.main === module) {
