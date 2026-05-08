@@ -111,15 +111,25 @@ router.get('/', (req, res) => {
                  AND created_at >= datetime('now', '-7 days')`,
               [item.id],
               (err2, row) => {
+                const LEAD_TIME_DAYS = 7;
+                const SAFETY_STOCK_DAYS = 3;
+
                 if (err2 || !row || row.total_used === 0) {
+                  const rop0 = item.min_threshold;
+                  let alertLevel0;
+                  if (item.current_amount === 0) alertLevel0 = 'depleted';
+                  else if (item.current_amount <= item.min_threshold) alertLevel0 = 'critical';
+                  else alertLevel0 = 'normal';
+
                   resolve({
                     ...item,
                     daily_average: 0,
                     days_remaining: null,
-                    status:
-                      item.current_amount <= item.min_threshold
-                        ? 'critical'
-                        : 'normal',
+                    status: item.current_amount <= item.min_threshold ? 'critical' : 'normal',
+                    reorder_point: rop0,
+                    suggested_order: null,
+                    alert_level: alertLevel0,
+                    lead_time_days: LEAD_TIME_DAYS,
                   });
                   return;
                 }
@@ -139,11 +149,24 @@ router.get('/', (req, res) => {
                   status = 'warning';
                 }
 
+                const reorderPoint = Math.ceil(dailyAvg * (LEAD_TIME_DAYS + SAFETY_STOCK_DAYS));
+                const suggestedOrderAmt = Math.ceil(dailyAvg * 30 - item.current_amount);
+
+                let alertLevel;
+                if (item.current_amount === 0) alertLevel = 'depleted';
+                else if (item.current_amount <= item.min_threshold) alertLevel = 'critical';
+                else if (item.current_amount <= reorderPoint) alertLevel = 'reorder';
+                else alertLevel = 'normal';
+
                 resolve({
                   ...item,
                   daily_average: parseFloat(dailyAvg.toFixed(2)),
                   days_remaining: daysRemaining,
                   status,
+                  reorder_point: reorderPoint,
+                  suggested_order: suggestedOrderAmt > 0 ? suggestedOrderAmt : null,
+                  alert_level: alertLevel,
+                  lead_time_days: LEAD_TIME_DAYS,
                 });
               }
             );
