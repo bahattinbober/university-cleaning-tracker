@@ -20,6 +20,7 @@ class _AdminAllUsersScreenState extends State<AdminAllUsersScreen> {
   List<dynamic> users = [];
   int _currentUserId = -1;
   int? _deletingId;
+  String? _token;
 
   @override
   void initState() {
@@ -30,7 +31,121 @@ class _AdminAllUsersScreenState extends State<AdminAllUsersScreen> {
 
   Future<void> _loadCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _currentUserId = prefs.getInt('userId') ?? -1);
+    if (mounted) {
+      setState(() {
+        _currentUserId = prefs.getInt('userId') ?? -1;
+        _token = prefs.getString('token');
+      });
+    }
+  }
+
+  Future<int?> _fetchCurrentTarget(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.1.27:4000/api/kpi/target/$userId'),
+        headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
+      );
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return body['target_value'] as int?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _showSetTargetDialog(int userId, String name) async {
+    final currentTarget = await _fetchCurrentTarget(userId);
+    if (!mounted) return;
+
+    final controller = TextEditingController(
+      text: currentTarget != null ? '$currentTarget' : '',
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hedef Ata: $name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (currentTarget != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Text(
+                  'Mevcut hedef: $currentTarget kayıt/hafta',
+                  style: AppTextStyles.caption,
+                ),
+              ),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Haftalık hedef (kayıt sayısı)',
+                hintText: 'Örn: 20',
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null || value < 1 || value > 1000) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                      content: Text('1-1000 arası geçerli bir sayı girin')),
+                );
+                return;
+              }
+              try {
+                final response = await http.post(
+                  Uri.parse('http://192.168.1.27:4000/api/kpi/target'),
+                  headers: {
+                    if (_token != null) 'Authorization': 'Bearer $_token',
+                    'Content-Type': 'application/json',
+                  },
+                  body: jsonEncode(
+                      {'user_id': userId, 'target_value': value}),
+                );
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+                if (response.statusCode == 200 && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          '$name için haftalık hedef: $value kayıt'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Hedef atanamadı'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Hata: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _fetchUsers() async {
@@ -228,9 +343,26 @@ class _AdminAllUsersScreenState extends State<AdminAllUsersScreen> {
                                         onSelected: (value) {
                                           if (value == 'delete') {
                                             _deleteUser(userId, name);
+                                          } else if (value == 'set_target') {
+                                            _showSetTargetDialog(
+                                                userId, name);
                                           }
                                         },
                                         itemBuilder: (_) => [
+                                          const PopupMenuItem<String>(
+                                            value: 'set_target',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.flag_outlined,
+                                                  color: AppColors.primary,
+                                                  size: 20,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Hedef Ata'),
+                                              ],
+                                            ),
+                                          ),
                                           const PopupMenuItem<String>(
                                             value: 'delete',
                                             child: Row(

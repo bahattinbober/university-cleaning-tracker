@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,13 +18,21 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
   Map<String, dynamic>? _data;
   String? _errorMessage;
 
+  bool _trendLoading = true;
+  List<Map<String, dynamic>> _trendData = [];
+
   @override
   void initState() {
     super.initState();
-    _fetchKpi();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await Future.wait([_fetchKpi(), _fetchTrend()]);
   }
 
   Future<void> _fetchKpi() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -59,6 +68,36 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _fetchTrend() async {
+    if (!mounted) return;
+    setState(() => _trendLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final uid = widget.userId ?? (prefs.getInt('userId') ?? -1);
+      final response = await http.get(
+        Uri.parse('http://192.168.1.27:4000/api/kpi/trend/$uid'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List;
+        setState(() {
+          _trendData = list.cast<Map<String, dynamic>>();
+          _trendLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _trendLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _trendLoading = false);
+    }
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([_fetchKpi(), _fetchTrend()]);
   }
 
   Color _scoreColor(int score) {
@@ -186,7 +225,7 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchKpi,
+            onPressed: _refresh,
           ),
         ],
       ),
@@ -197,7 +236,7 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
               : _data == null
                   ? const Center(child: Text('Veri yok'))
                   : RefreshIndicator(
-                      onRefresh: _fetchKpi,
+                      onRefresh: _refresh,
                       child: ListView(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         children: [
@@ -208,6 +247,10 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
                           _buildComponents(),
                           const SizedBox(height: AppSpacing.md),
                           _buildBenchmark(),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildTargetCard(),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildTrendCard(),
                           const SizedBox(height: AppSpacing.md),
                           ElevatedButton.icon(
                             onPressed: _showBreakdownDialog,
@@ -224,6 +267,8 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
                     ),
     );
   }
+
+  // ── Widgets ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
     final user = _data!['user'] as Map<String, dynamic>;
@@ -343,9 +388,9 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
     const items = ['productivity', 'quality', 'timeliness', 'compliance'];
     const icons = <String, IconData>{
       'productivity': Icons.speed,
-      'quality':      Icons.star,
-      'timeliness':   Icons.schedule,
-      'compliance':   Icons.verified,
+      'quality': Icons.star,
+      'timeliness': Icons.schedule,
+      'compliance': Icons.verified,
     };
 
     return Card(
@@ -428,15 +473,283 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
             Text('Karşılaştırma', style: AppTextStyles.heading2),
             const SizedBox(height: AppSpacing.sm),
             _benchmarkRow(
-                'Senin kayıtların:', '${stats['total']}', bold: true),
+                'Senin kayıtların:', '${stats['total']}',
+                bold: true),
             const SizedBox(height: 4),
             _benchmarkRow('Sistem ortalaması:',
                 '${benchmark['system_average_records']}'),
             const SizedBox(height: 4),
             _benchmarkRow(
-                'Hedef:', '${benchmark['productivity_target']}'),
+                'Verimlilik hedefi:',
+                '${benchmark['productivity_target']} kayıt'),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTargetCard() {
+    final benchmark = _data!['benchmark'] as Map<String, dynamic>;
+    final stats = _data!['stats'] as Map<String, dynamic>;
+    final target = benchmark['target'] as int?;
+    final completion = benchmark['target_completion'] as int?;
+    final total = stats['total'] as int? ?? 0;
+
+    if (target == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Icon(Icons.flag_outlined,
+                  color: AppColors.textSecondary, size: 28),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Haftalık Hedef',
+                        style: AppTextStyles.body
+                            .copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Yöneticin sana henüz hedef atamadı.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final pct = (completion ?? 0).clamp(0, 100);
+    final color = pct >= 85
+        ? AppColors.success
+        : pct >= 60
+            ? AppColors.warning
+            : AppColors.error;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.flag, color: color, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Text('Haftalık Hedef Tutturma',
+                    style: AppTextStyles.heading2),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CircularProgressIndicator(
+                        value: pct / 100,
+                        strokeWidth: 10,
+                        backgroundColor:
+                            Colors.grey.withValues(alpha: 0.2),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(color),
+                      ),
+                      Center(
+                        child: Text(
+                          '%$pct',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$total / $target',
+                      style: AppTextStyles.heading2,
+                    ),
+                    Text('kayıt / hedef',
+                        style: AppTextStyles.caption),
+                    const SizedBox(height: AppSpacing.sm),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        pct >= 100
+                            ? 'Hedefe Ulaşıldı!'
+                            : '${target - total} kayıt kaldı',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrendCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.show_chart,
+                    color: AppColors.primary, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Text('7 Günlük Trend', style: AppTextStyles.heading2),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text('Günlük temizlik kaydı sayısı',
+                style: AppTextStyles.caption),
+            const SizedBox(height: AppSpacing.md),
+            if (_trendLoading)
+              const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_trendData.isEmpty ||
+                _trendData.every((d) => (d['count'] as int? ?? 0) == 0))
+              const SizedBox(
+                height: 100,
+                child: Center(
+                  child: Text('Bu hafta henüz kayıt yok.',
+                      style: AppTextStyles.caption),
+                ),
+              )
+            else
+              SizedBox(height: 200, child: _buildLineChart()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLineChart() {
+    final spots = <FlSpot>[];
+    double maxY = 1;
+
+    for (int i = 0; i < _trendData.length; i++) {
+      final count = (_trendData[i]['count'] as int? ?? 0).toDouble();
+      spots.add(FlSpot(i.toDouble(), count));
+      if (count > maxY) maxY = count;
+    }
+
+    String dayLabel(int index) {
+      if (index < 0 || index >= _trendData.length) return '';
+      final dateStr = _trendData[index]['date'] as String? ?? '';
+      try {
+        final dt = DateTime.parse(dateStr);
+        const names = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+        return names[(dt.weekday - 1) % 7];
+      } catch (_) {
+        return '';
+      }
+    }
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: 6,
+        minY: 0,
+        maxY: maxY + 1,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withValues(alpha: 0.15),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final label = dayLabel(value.toInt());
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(label,
+                      style: AppTextStyles.caption
+                          .copyWith(fontSize: 11)),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: (maxY / 4).ceilToDouble().clamp(1, double.infinity),
+              getTitlesWidget: (value, meta) => Text(
+                value.toInt().toString(),
+                style:
+                    AppTextStyles.caption.copyWith(fontSize: 11),
+              ),
+            ),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            curveSmoothness: 0.35,
+            color: AppColors.primary,
+            barWidth: 2.5,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, pct, bar, idx) =>
+                  FlDotCirclePainter(
+                radius: 4,
+                color: AppColors.primary,
+                strokeColor: Colors.white,
+                strokeWidth: 2,
+              ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppColors.primary.withValues(alpha: 0.08),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -450,7 +763,8 @@ class _KpiDetailScreenState extends State<KpiDetailScreen> {
         Text(
           value,
           style: bold
-              ? AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)
+              ? AppTextStyles.body
+                  .copyWith(fontWeight: FontWeight.bold)
               : AppTextStyles.body,
         ),
       ],

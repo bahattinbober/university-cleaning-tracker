@@ -261,8 +261,21 @@ db.serialize(() => {
     )
   `);
 
+  // KPI TARGETS TABLOSU
+  db.run(`
+    CREATE TABLE IF NOT EXISTS kpi_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      target_value INTEGER NOT NULL DEFAULT 15,
+      set_by INTEGER NOT NULL,
+      set_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (set_by) REFERENCES users(id)
+    )
+  `);
+
   console.log(
-    '✅ Tablolar oluşturuldu (users, locations, rooms, cleaning_logs, scheduled_tasks, inventory, inventory_logs)'
+    '✅ Tablolar oluşturuldu (users, locations, rooms, cleaning_logs, scheduled_tasks, inventory, inventory_logs, kpi_targets)'
   );
 
   // Varsayılan admin seed — yalnızca env'de her iki değişken de varsa çalışır

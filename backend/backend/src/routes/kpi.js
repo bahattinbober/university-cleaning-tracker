@@ -28,6 +28,97 @@ router.get('/user/:id', (req, res, next) => {
   await calculateAndReturn(Number(req.params.id), res);
 });
 
+// POST /api/kpi/target -> admin hedef atar
+router.post('/target', (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Sadece admin hedef atayabilir' });
+  }
+
+  const { user_id, target_value } = req.body;
+
+  if (!user_id || !target_value || target_value < 1 || target_value > 1000) {
+    return res.status(400).json({ message: 'Geçersiz hedef değeri (1-1000 arası)' });
+  }
+
+  const sql = `
+    INSERT INTO kpi_targets (user_id, target_value, set_by)
+    VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      target_value = excluded.target_value,
+      set_by       = excluded.set_by,
+      set_at       = datetime('now')
+  `;
+
+  db.run(sql, [user_id, target_value, req.user.id], function (err) {
+    if (err) {
+      console.error('KPI target kayıt hatası:', err);
+      return res.status(500).json({ message: 'Hedef kaydedilemedi' });
+    }
+    res.json({ message: 'Hedef başarıyla atandı', user_id, target_value });
+  });
+});
+
+// GET /api/kpi/target/:user_id -> hedef getir
+router.get('/target/:user_id', (req, res) => {
+  const userId = Number(req.params.user_id);
+
+  if (req.user.role !== 'admin' && req.user.id !== userId) {
+    return res.status(403).json({ message: 'Yetkiniz yok' });
+  }
+
+  db.get(
+    'SELECT * FROM kpi_targets WHERE user_id = ?',
+    [userId],
+    (err, row) => {
+      if (err) return res.status(500).json({ message: 'Hata' });
+      res.json(row || { user_id: userId, target_value: null });
+    }
+  );
+});
+
+// GET /api/kpi/trend/:user_id -> son 7 günlük günlük kayıt sayısı
+router.get('/trend/:user_id', (req, res) => {
+  const userId = Number(req.params.user_id);
+
+  if (req.user.role !== 'admin' && req.user.id !== userId) {
+    return res.status(403).json({ message: 'Yetkiniz yok' });
+  }
+
+  const sql = `
+    SELECT
+      DATE(cleaned_at) as date,
+      COUNT(*) as count,
+      SUM(CASE WHEN image IS NOT NULL AND image != '' THEN 1 ELSE 0 END) as photo_count,
+      SUM(CASE WHEN notes IS NOT NULL AND notes != '' THEN 1 ELSE 0 END) as note_count
+    FROM cleaning_logs
+    WHERE user_id = ?
+      AND cleaned_at >= datetime('now', '-7 days')
+    GROUP BY DATE(cleaned_at)
+    ORDER BY date ASC
+  `;
+
+  db.all(sql, [userId], (err, rows) => {
+    if (err) return res.status(500).json({ message: 'Hata' });
+
+    // Eksik günleri 0 ile doldur
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const found = rows.find((r) => r.date === dateStr);
+      result.push({
+        date: dateStr,
+        count: found ? found.count : 0,
+        photo_count: found ? found.photo_count : 0,
+        note_count: found ? found.note_count : 0,
+      });
+    }
+
+    res.json(result);
+  });
+});
+
 async function calculateAndReturn(userId, res) {
   try {
     const user = await dbGet(
@@ -49,11 +140,11 @@ async function calculateAndReturn(userId, res) {
       [userId]
     );
 
-    const total = Number(stats?.total || 0);
-    const noted = Number(stats?.noted || 0);
-    const photo = Number(stats?.photo || 0);
+    const total   = Number(stats?.total   || 0);
+    const noted   = Number(stats?.noted   || 0);
+    const photo   = Number(stats?.photo   || 0);
     const on_time = Number(stats?.on_time || 0);
-    const late = Number(stats?.late || 0);
+    const late    = Number(stats?.late    || 0);
 
     // Sistem ortalaması (tüm aktif personelin son 7 günü)
     const systemAvg = await dbGet(
@@ -67,6 +158,16 @@ async function calculateAndReturn(userId, res) {
        )`
     );
     const avgTotal = Math.max(Number(systemAvg?.avg_total || 0), 10);
+
+    // Kişisel hedef
+    const targetRow = await dbGet(
+      'SELECT target_value FROM kpi_targets WHERE user_id = ?',
+      [userId]
+    );
+    const target = targetRow ? targetRow.target_value : null;
+    const targetCompletion = target
+      ? Math.min(100, Math.round((total / target) * 100))
+      : null;
 
     // ── 4 BİLEŞEN (0-100) ──────────────────────────────────────────────────
 
@@ -107,11 +208,11 @@ async function calculateAndReturn(userId, res) {
 
     // Performans seviyesi
     let level, levelName, levelEmoji;
-    if      (overall >= 85) { level = 5; levelName = 'Üstün Performans';    levelEmoji = '⭐'; }
-    else if (overall >= 70) { level = 4; levelName = 'Yüksek Performans';  levelEmoji = '🟢'; }
-    else if (overall >= 55) { level = 3; levelName = 'İyi Performans';     levelEmoji = '🔵'; }
-    else if (overall >= 40) { level = 2; levelName = 'Gelişmekte';         levelEmoji = '🟡'; }
-    else                    { level = 1; levelName = 'Geliştirilmeli';     levelEmoji = '🔴'; }
+    if      (overall >= 85) { level = 5; levelName = 'Üstün Performans';  levelEmoji = '⭐'; }
+    else if (overall >= 70) { level = 4; levelName = 'Yüksek Performans'; levelEmoji = '🟢'; }
+    else if (overall >= 55) { level = 3; levelName = 'İyi Performans';    levelEmoji = '🔵'; }
+    else if (overall >= 40) { level = 2; levelName = 'Gelişmekte';        levelEmoji = '🟡'; }
+    else                    { level = 1; levelName = 'Geliştirilmeli';    levelEmoji = '🔴'; }
 
     // Eski formül (geriye uyumluluk)
     const legacyScore = total * 5 + noted * 1 + photo * 2 + on_time * 4 - late * 2;
@@ -138,6 +239,8 @@ async function calculateAndReturn(userId, res) {
         system_average_records: Math.round(avgTotal),
         productivity_target:    Math.round(productivityTarget),
         records_above_average:  Math.max(0, total - Math.round(avgTotal)),
+        target,
+        target_completion:      targetCompletion,
       },
 
       legacy_score: legacyScore,
@@ -146,11 +249,11 @@ async function calculateAndReturn(userId, res) {
       level: { number: level, name: levelName, emoji: levelEmoji },
 
       breakdown: [
-        { label: 'Toplam Kayıt', count: total,   points: total   * 5, formula: `${total} × 5`    },
-        { label: 'Fotoğraflı',  count: photo,   points: photo   * 2, formula: `${photo} × 2`    },
-        { label: 'Notlu',       count: noted,   points: noted   * 1, formula: `${noted} × 1`    },
-        { label: 'Zamanında',   count: on_time, points: on_time * 4, formula: `${on_time} × 4`  },
-        { label: 'Geç (ceza)',  count: late,    points: -late   * 2, formula: `-${late} × 2`    },
+        { label: 'Toplam Kayıt', count: total,   points: total   * 5, formula: `${total} × 5`   },
+        { label: 'Fotoğraflı',  count: photo,   points: photo   * 2, formula: `${photo} × 2`   },
+        { label: 'Notlu',       count: noted,   points: noted   * 1, formula: `${noted} × 1`   },
+        { label: 'Zamanında',   count: on_time, points: on_time * 4, formula: `${on_time} × 4` },
+        { label: 'Geç (ceza)',  count: late,    points: -late   * 2, formula: `-${late} × 2`   },
       ],
     });
   } catch (err) {
