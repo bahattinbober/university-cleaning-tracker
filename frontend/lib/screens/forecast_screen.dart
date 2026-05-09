@@ -54,7 +54,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
         });
       } else {
         setState(() {
-          _errorMessage = 'Veri alinamadi (${response.statusCode})';
+          _errorMessage = 'Veri alınamadı (${response.statusCode})';
           _isLoading = false;
         });
       }
@@ -160,7 +160,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
               children: [
                 Expanded(
                   child: _statBox(
-                    'Gunluk Ortalama',
+                    'Günlük Ortalama',
                     '$avgDaily ${widget.itemUnit}',
                     AppColors.primary,
                   ),
@@ -168,7 +168,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: _statBox(
-                    '7 Gun Tahmini',
+                    '7 Gün Tahmini',
                     '${total7.toStringAsFixed(1)} ${widget.itemUnit}',
                     AppColors.warning,
                   ),
@@ -238,7 +238,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('30 Gun Gecmis + 7 Gun Tahmin',
+            Text('30 Gün Geçmiş + 7 Gün Tahmin',
                 style: AppTextStyles.heading2),
             const SizedBox(height: AppSpacing.md),
             SizedBox(
@@ -263,15 +263,15 @@ class _ForecastScreenState extends State<ForecastScreen> {
                         getTitlesWidget: (value, meta) {
                           final i = value.toInt();
                           if (i == 0) {
-                            return const Text('30g\nonce',
+                            return const Text('30g\nönce',
                                 style: TextStyle(fontSize: 9));
                           }
                           if (i == 15) {
-                            return const Text('15g\nonce',
+                            return const Text('15g\nönce',
                                 style: TextStyle(fontSize: 9));
                           }
                           if (i == 30) {
-                            return const Text('Bugun',
+                            return const Text('Bugün',
                                 style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold));
@@ -316,9 +316,9 @@ class _ForecastScreenState extends State<ForecastScreen> {
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
-                _legendDot(AppColors.primary, 'Gecmis kullanim'),
+                _legendDot(AppColors.primary, 'Geçmiş kullanım'),
                 const SizedBox(width: AppSpacing.md),
-                _legendDot(AppColors.warning, 'Tahmin (7 gun)'),
+                _legendDot(AppColors.warning, 'Tahmin (7 gün)'),
               ],
             ),
           ],
@@ -355,13 +355,13 @@ class _ForecastScreenState extends State<ForecastScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Tahmin Yontemleri', style: AppTextStyles.heading2),
+            Text('Tahmin Yöntemleri', style: AppTextStyles.heading2),
             const SizedBox(height: AppSpacing.sm),
-            _methodRow('Moving Average (5 gun)', '$ma ${widget.itemUnit}/gun'),
+            _methodRow('Moving Average (5 gün)', '$ma ${widget.itemUnit}/gün'),
             _methodRow(
-                'Exponential Smoothing (a=0.3)', '$es ${widget.itemUnit}/gun'),
+                'Exponential Smoothing (a=0.3)', '$es ${widget.itemUnit}/gün'),
             _methodRow(
-              'Linear Trend (egim)',
+              'Linear Trend (eğim)',
               lt > 0
                   ? '+${lt.toStringAsFixed(2)} (artan)'
                   : '${lt.toStringAsFixed(2)} (azalan)',
@@ -374,8 +374,8 @@ class _ForecastScreenState extends State<ForecastScreen> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                'Tahmin, uc yontemin ortalamasidir. Linear trend, '
-                'gelecek gunler icin hafifce artar/azalir.',
+                'Tahmin, üç yöntemin ortalamasıdır. Linear trend, '
+                'gelecek günler için hafifçe artar/azalır.',
                 style: AppTextStyles.caption,
               ),
             ),
@@ -410,7 +410,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('7 Gunluk Detay', style: AppTextStyles.heading2),
+            Text('7 Günlük Detay', style: AppTextStyles.heading2),
             const SizedBox(height: AppSpacing.sm),
             Table(
               border:
