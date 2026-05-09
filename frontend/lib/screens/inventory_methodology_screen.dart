@@ -211,6 +211,34 @@ class InventoryMethodologyScreen extends StatelessWidget {
             note: 'Daha yüksek servis seviyesi = daha yüksek Z değeri',
           ),
           const SizedBox(height: AppSpacing.md),
+          _buildSection(
+            icon: Icons.trending_up,
+            color: AppColors.warning,
+            title: '9. Talep Tahmini (Demand Forecasting)',
+            content:
+                'Sistem, her stok kalemi için geçmiş 30 günlük tüketim verisini '
+                'kullanarak gelecek 7 günü tahmin eder. Üç farklı yöntem '
+                'birleştirilerek daha güvenilir bir tahmin elde edilir:\n\n'
+                '• Hareketli Ortalama (5 gün): kısa vadeli dalgalanmaları yumuşatır\n'
+                '• Üstel Düzleştirme (α=0.3, Brown 1956): son verilere daha fazla ağırlık verir\n'
+                '• Lineer Trend Analizi: uzun vadeli artış/azalış eğilimini yakalar\n\n'
+                'Nihai tahmin, üç yöntemin ortalamasıdır. Bu yaklaşım tek bir '
+                'yönteme bağımlılığı azaltarak daha dengeli ve sağlam tahmin sunar.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildFormulaCard(
+            title: 'Tahmin Formülleri',
+            formula:
+                'Hareketli Ortalama:\n'
+                '  MA = (x[n-4] + x[n-3] + ... + x[n]) / 5\n\n'
+                'Üstel Düzleştirme (Brown 1956):\n'
+                '  S[t] = α * x[t] + (1-α) * S[t-1],  α = 0.3\n\n'
+                'Lineer Trend (En Küçük Kareler):\n'
+                '  ŷ = a + b * t\n\n'
+                'Final tahmin = ortalama(MA, ES, LT)',
+            note: 'α değeri artarsa son verilere daha fazla ağırlık verilir',
+          ),
+          const SizedBox(height: AppSpacing.md),
           _buildReferencesCard(),
           const SizedBox(height: AppSpacing.lg),
         ],
@@ -430,6 +458,8 @@ class InventoryMethodologyScreen extends StatelessWidget {
                 'Envanter sınıflandırma standartları.'),
             _ref('Ohno, T. (1988). Toyota Production System. '
                 'Just-In-Time ve lean envanter prensipleri.'),
+            _ref('Brown, R. G. (1956). Exponential Smoothing for Predicting Demand. '
+                'Üstel düzleştirme yönteminin ilk formülasyonu; talep tahmini temeli.'),
           ],
         ),
       ),

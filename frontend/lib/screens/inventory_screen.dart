@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/pdf_report_service.dart';
 import '../theme/app_theme.dart';
+import 'forecast_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -659,6 +660,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () => _showRestockDialog(item),
+                          ),
+                        if ((item['daily_average'] as num? ?? 0) > 0)
+                          IconButton(
+                            icon: const Icon(Icons.trending_up),
+                            color: AppColors.warning,
+                            tooltip: 'Talep Tahmini',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ForecastScreen(
+                                  itemId: item['id'] as int,
+                                  itemName:
+                                      item['name']?.toString() ?? '-',
+                                  itemUnit:
+                                      item['unit']?.toString() ?? '',
+                                ),
+                              ),
+                            ),
                           ),
                       ],
                     ),

@@ -294,6 +294,87 @@ router.delete('/:id', ensureAdmin, (req, res) => {
   });
 });
 
+// GET /api/inventory/:id/forecast -> 30 günlük geçmişten 7 günlük tahmin
+router.get('/:id/forecast', (req, res) => {
+  const id = Number(req.params.id);
+
+  const sql = `
+    SELECT
+      DATE(created_at) as day,
+      SUM(amount) as daily_usage
+    FROM inventory_logs
+    WHERE inventory_id = ?
+      AND action = 'use'
+      AND created_at >= datetime('now', '-30 days')
+    GROUP BY DATE(created_at)
+    ORDER BY day ASC
+  `;
+
+  db.all(sql, [id], (err, rows) => {
+    if (err) return res.status(500).json({ message: 'DB hatası' });
+
+    const today = new Date();
+    const fullData = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dayStr = date.toISOString().split('T')[0];
+      const found = rows.find(r => r.day === dayStr);
+      fullData.push({ day: dayStr, usage: found ? Number(found.daily_usage) : 0 });
+    }
+
+    const usages = fullData.map(d => d.usage);
+
+    if (usages.every(u => u === 0)) {
+      return res.json({
+        historical: fullData,
+        forecast: [],
+        methods: {},
+        summary: {
+          has_data: false,
+          message: 'Son 30 gunde kullanim verisi yok',
+        },
+      });
+    }
+
+    const movingAvg = calculateMovingAverage(usages, 5);
+    const expSmooth = calculateExponentialSmoothing(usages, 0.3);
+    const linearForecast = calculateLinearTrend(usages, 7);
+
+    const forecast = [];
+    for (let i = 1; i <= 7; i++) {
+      const futureDate = new Date(today);
+      futureDate.setDate(futureDate.getDate() + i);
+      const linVal = linearForecast[i - 1];
+      forecast.push({
+        day: futureDate.toISOString().split('T')[0],
+        moving_avg: parseFloat(movingAvg.toFixed(2)),
+        exp_smooth: parseFloat(expSmooth.toFixed(2)),
+        linear: parseFloat(linVal.toFixed(2)),
+        forecast: parseFloat(((movingAvg + expSmooth + linVal) / 3).toFixed(2)),
+      });
+    }
+
+    const totalForecast = forecast.reduce((sum, f) => sum + f.forecast, 0);
+
+    res.json({
+      historical: fullData,
+      forecast,
+      methods: {
+        moving_average: parseFloat(movingAvg.toFixed(2)),
+        exponential_smoothing: parseFloat(expSmooth.toFixed(2)),
+        linear_trend_slope: parseFloat((linearForecast[1] - linearForecast[0]).toFixed(4)),
+      },
+      summary: {
+        has_data: true,
+        avg_daily_usage: parseFloat((usages.reduce((s, u) => s + u, 0) / 30).toFixed(2)),
+        total_7day_forecast: parseFloat(totalForecast.toFixed(2)),
+        message: 'Tahmin son 30 gunluk veriye dayalidir',
+      },
+    });
+  });
+});
+
 // GET /api/inventory/:id/logs -> hareket geçmişi
 router.get('/:id/logs', (req, res) => {
   const id = Number(req.params.id);
@@ -311,5 +392,40 @@ router.get('/:id/logs', (req, res) => {
     }
   );
 });
+
+// ── Forecast helpers ──────────────────────────────────────────────────────────
+
+function calculateMovingAverage(data, window) {
+  if (data.length === 0) return 0;
+  const slice = data.length < window ? data : data.slice(-window);
+  return slice.reduce((s, v) => s + v, 0) / slice.length;
+}
+
+function calculateExponentialSmoothing(data, alpha) {
+  if (data.length === 0) return 0;
+  let s = data[0];
+  for (let i = 1; i < data.length; i++) {
+    s = alpha * data[i] + (1 - alpha) * s;
+  }
+  return s;
+}
+
+function calculateLinearTrend(data, daysAhead) {
+  const n = data.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i; sumY += data[i];
+    sumXY += i * data[i]; sumX2 += i * i;
+  }
+  const denom = n * sumX2 - sumX * sumX;
+  const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+  const intercept = (sumY - slope * sumX) / n;
+
+  const result = [];
+  for (let i = 1; i <= daysAhead; i++) {
+    result.push(Math.max(0, intercept + slope * (n + i - 1)));
+  }
+  return result;
+}
 
 module.exports = router;
