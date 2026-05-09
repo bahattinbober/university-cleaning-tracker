@@ -797,6 +797,21 @@ class PdfReportService {
               pw.SizedBox(height: 15),
             ],
 
+            // EOQ tablosu
+            pw.Text(
+              'Optimum Siparis Miktari (Wilson EOQ)',
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.purple800,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            _invEoqTable(inventoryItems
+                .where((i) => (i['eoq_optimal_order'] as num? ?? 0) > 0)
+                .toList()),
+            pw.SizedBox(height: 12),
+
             // Tüm stok tablosu
             pw.Text(
               'Tum Stok Kalemleri',
@@ -1108,6 +1123,48 @@ class PdfReportService {
             ],
           );
         }),
+      ],
+    );
+  }
+
+  static pw.Widget _invEoqTable(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Text(
+          'Henuz tuketim verisi olmayan kalemler icin EOQ hesaplanamaz.',
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+        ),
+      );
+    }
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(3),
+        1: pw.FlexColumnWidth(2),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.purple100),
+          children: [
+            _invTh('Urun'),
+            _invTh('Q* (EOQ)'),
+            _invTh('Yillik Tal.'),
+            _invTh('Sip. Aralik'),
+          ],
+        ),
+        ...items.map(
+          (item) => pw.TableRow(
+            children: [
+              _invTd(item['name']?.toString() ?? '-'),
+              _invTd('${item['eoq_optimal_order']} ${item['unit'] ?? ''}'),
+              _invTd('${item['annual_demand']} ${item['unit'] ?? ''}'),
+              _invTd('${item['days_between_orders'] ?? '-'} gun'),
+            ],
+          ),
+        ),
       ],
     );
   }

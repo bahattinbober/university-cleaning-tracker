@@ -530,6 +530,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               final daysRemaining = item['days_remaining'];
               final reorderPoint = item['reorder_point'];
               final suggestedOrder = item['suggested_order'];
+              final eoqOrder = item['eoq_optimal_order'];
 
               return Container(
                 margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -569,6 +570,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                    if (eoqOrder != null && (eoqOrder as num) > 0)
+                      Text(
+                        'EOQ optimum: $eoqOrder ${item['unit']}',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                     if (daysRemaining != null)
                       Text(
                         'Tahmini bitis: $daysRemaining gun',
@@ -594,6 +603,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final dailyAvg = item['daily_average'] ?? 0;
     final reorderPoint = item['reorder_point'];
     final suggestedOrder = item['suggested_order'];
+    final eoq = item['eoq_optimal_order'];
+    final daysBetween = item['days_between_orders'];
     final needsOrder = alertLevel == 'reorder' ||
         alertLevel == 'critical' ||
         alertLevel == 'depleted';
@@ -700,6 +711,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       const SizedBox(height: 2),
                       Text(
                         'Yeniden siparis seviyesi: $reorderPoint ${item['unit']}',
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
+
+                    // EOQ
+                    if (eoq != null && (eoq as num) > 0) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.calculate_outlined,
+                              size: 14, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Optimum siparis (EOQ): $eoq ${item['unit']}',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (daysBetween != null && (daysBetween as num) > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Siparis araligi: $daysBetween gun',
                         style: AppTextStyles.caption,
                       ),
                     ],

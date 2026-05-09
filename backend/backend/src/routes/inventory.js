@@ -113,6 +113,9 @@ router.get('/', (req, res) => {
               (err2, row) => {
                 const LEAD_TIME_DAYS = 7;
                 const SAFETY_STOCK_DAYS = 3;
+                const ORDER_COST = 50;
+                const HOLDING_COST_PER_UNIT = 10;
+                const SERVICE_LEVEL_Z = 1.65;
 
                 if (err2 || !row || row.total_used === 0) {
                   const rop0 = item.min_threshold;
@@ -130,6 +133,13 @@ router.get('/', (req, res) => {
                     suggested_order: null,
                     alert_level: alertLevel0,
                     lead_time_days: LEAD_TIME_DAYS,
+                    eoq_optimal_order: 0,
+                    annual_demand: 0,
+                    orders_per_year: 0,
+                    days_between_orders: null,
+                    safety_stock_statistical: item.min_threshold,
+                    service_level: 95,
+                    cost_parameters: { order_cost: ORDER_COST, holding_cost: HOLDING_COST_PER_UNIT },
                   });
                   return;
                 }
@@ -158,6 +168,13 @@ router.get('/', (req, res) => {
                 else if (item.current_amount <= reorderPoint) alertLevel = 'reorder';
                 else alertLevel = 'normal';
 
+                const annualDemand = dailyAvg * 365;
+                const eoq = Math.ceil(Math.sqrt((2 * annualDemand * ORDER_COST) / HOLDING_COST_PER_UNIT));
+                const ordersPerYear = eoq > 0 ? Math.round(annualDemand / eoq) : 0;
+                const daysBetweenOrders = ordersPerYear > 0 ? Math.round(365 / ordersPerYear) : null;
+                const demandStdDev = dailyAvg * 0.3;
+                const safetyStockStat = Math.ceil(SERVICE_LEVEL_Z * demandStdDev * Math.sqrt(LEAD_TIME_DAYS));
+
                 resolve({
                   ...item,
                   daily_average: parseFloat(dailyAvg.toFixed(2)),
@@ -167,6 +184,13 @@ router.get('/', (req, res) => {
                   suggested_order: suggestedOrderAmt > 0 ? suggestedOrderAmt : null,
                   alert_level: alertLevel,
                   lead_time_days: LEAD_TIME_DAYS,
+                  eoq_optimal_order: eoq,
+                  annual_demand: Math.round(annualDemand),
+                  orders_per_year: ordersPerYear,
+                  days_between_orders: daysBetweenOrders,
+                  safety_stock_statistical: safetyStockStat,
+                  service_level: 95,
+                  cost_parameters: { order_cost: ORDER_COST, holding_cost: HOLDING_COST_PER_UNIT },
                 });
               }
             );

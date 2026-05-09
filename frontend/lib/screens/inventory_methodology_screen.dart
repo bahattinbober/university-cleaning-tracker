@@ -161,6 +161,56 @@ class InventoryMethodologyScreen extends StatelessWidget {
                 'modern envanter yönetiminin temelidir.',
           ),
           const SizedBox(height: AppSpacing.md),
+          _buildSection(
+            icon: Icons.calculate_outlined,
+            color: AppColors.primary,
+            title: '7. Optimum Sipariş Miktarı (EOQ)',
+            content:
+                'F. W. Harris\'in 1913\'te ortaya attığı ve R. H. Wilson\'ın '
+                '1934\'te genelleştirdiği Ekonomik Sipariş Miktarı (Economic Order '
+                'Quantity, EOQ) modeli, klasik envanter optimizasyon yöntemidir. '
+                'Bir defada ne kadar sipariş verilmesi gerektiğini hesaplar.\n\n'
+                'Model, iki temel maliyeti dengeler:\n\n'
+                '• Sipariş maliyeti (S): her sipariş seferi maliyeti\n'
+                '• Taşıma maliyeti (H): birim başına yıllık depolama maliyeti\n\n'
+                'Sistem, varsayılan olarak S=50 TL ve H=10 TL/birim/yıl kullanır. '
+                'Bu değerler, gerçek satın alma verisi ile güncellenebilir.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildFormulaCard(
+            title: 'EOQ Formülü (Wilson 1934)',
+            formula:
+                'Q* = sqrt(2 * D * S / H)\n\n'
+                'D = yıllık talep (günlük_ortalama * 365)\n'
+                'S = sipariş başına maliyet (50 TL)\n'
+                'H = birim başına yıllık taşıma (10 TL)\n\n'
+                'Yıllık sipariş sayısı = D / Q*\n'
+                'İki sipariş arası gün  = 365 / (D/Q*)',
+            note: 'Maliyet parametreleri ihtiyaca göre ayarlanabilir',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _buildSection(
+            icon: Icons.security_outlined,
+            color: AppColors.warning,
+            title: '8. İstatistiksel Güvenlik Stoğu',
+            content:
+                'Sabit gün sayısı yerine, talep belirsizliğini hesaba katan '
+                'istatistiksel güvenlik stoğu kullanılır. Bu yaklaşım, %95 '
+                'servis seviyesi (stoksuz kalmama olasılığı) garanti eder.\n\n'
+                'Formül, talebin standart sapması ve tedarik süresinin karekökü '
+                'ile orantılıdır. Talep dalgalandıkça güvenlik stoğu artar.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildFormulaCard(
+            title: 'Safety Stock Formülü',
+            formula:
+                'SS = Z * sigma * sqrt(L)\n\n'
+                'Z = 1.65 (%95 servis seviyesi)\n'
+                'sigma = talep standart sapması (günlük_ort * 0.3)\n'
+                'L = tedarik süresi (lead time, 7 gün)',
+            note: 'Daha yüksek servis seviyesi = daha yüksek Z değeri',
+          ),
+          const SizedBox(height: AppSpacing.md),
           _buildReferencesCard(),
           const SizedBox(height: AppSpacing.lg),
         ],
