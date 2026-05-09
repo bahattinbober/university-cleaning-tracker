@@ -34,13 +34,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Future<void> _generatePdfReport() async {
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Stok listesi bos, once yukleme yapin')),
+        const SnackBar(content: Text('Stok listesi boş, önce yükleme yapın')),
       );
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('PDF olusturuluyor...'),
+        content: Text('PDF oluşturuluyor...'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -54,7 +54,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       if (abcResponse.statusCode != 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ABC verisi alinamadi')),
+            const SnackBar(content: Text('ABC verisi alınamadı')),
           );
         }
         return;
@@ -94,14 +94,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
         });
       } else if (mounted) {
         setState(() {
-          _errorMessage = 'Veri alinamadi (${response.statusCode})';
+          _errorMessage = 'Veri alınamadı (${response.statusCode})';
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Baglanti hatasi: $e';
+          _errorMessage = 'Bağlantı hatası: $e';
           _isLoading = false;
         });
       }
@@ -125,8 +125,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Malzeme Adi',
-                  hintText: 'Orn: Camasir deterjani',
+                  labelText: 'Malzeme Adı',
+                  hintText: 'Örn: Çamaşır deterjanı',
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -163,7 +163,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Iptal'),
+            child: const Text('İptal'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -239,7 +239,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Iptal'),
+            child: const Text('İptal'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -264,7 +264,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   navigator.pop();
                   await _fetchInventory();
                   messenger.showSnackBar(
-                    const SnackBar(content: Text('Stok guncellendi')),
+                    const SnackBar(content: Text('Stok güncellendi')),
                   );
                 } else {
                   messenger.showSnackBar(
@@ -302,11 +302,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
   String _alertLabel(String? level) {
     switch (level) {
       case 'depleted':
-        return 'Tukendi';
+        return 'Tükendi';
       case 'critical':
         return 'Kritik';
       case 'reorder':
-        return 'Siparis Zamani';
+        return 'Sipariş Zamanı';
       default:
         return 'Normal';
     }
@@ -346,7 +346,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Stok Yonetimi'),
+        title: const Text('Stok Yönetimi'),
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -388,7 +388,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           child: Padding(
                             padding: EdgeInsets.all(AppSpacing.lg),
                             child: Text(
-                              'Henuz malzeme yok\n+ butonu ile ekleyin',
+                              'Henüz malzeme yok\n+ butonu ile ekleyin',
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -456,7 +456,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       children: [
         _chip('Normal: $normalCount', AppColors.success),
         const SizedBox(width: AppSpacing.sm),
-        _chip('Siparis: $reorderCount', AppColors.warning),
+        _chip('Sipariş: $reorderCount', AppColors.warning),
         const SizedBox(width: AppSpacing.sm),
         _chip('Kritik: $criticalCount', AppColors.error),
       ],
@@ -513,7 +513,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    'Siparis Onerileri (${items.length} urun)',
+                    'Sipariş Önerileri (${items.length} ürün)',
                     style: AppTextStyles.heading2,
                   ),
                 ),
@@ -521,7 +521,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Wilson EOQ tabanli yeniden siparis noktasi',
+              'Wilson EOQ tabanlı yeniden sipariş noktası',
               style: AppTextStyles.caption,
             ),
             const SizedBox(height: AppSpacing.md),
@@ -565,7 +565,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                     if (suggestedOrder != null)
                       Text(
-                        'Onerilen siparis: $suggestedOrder ${item['unit']}',
+                        'Önerilen sipariş: $suggestedOrder ${item['unit']}',
                         style: AppTextStyles.caption.copyWith(
                           color: color,
                           fontWeight: FontWeight.w600,
@@ -581,7 +581,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                     if (daysRemaining != null)
                       Text(
-                        'Tahmini bitis: $daysRemaining gun',
+                        'Tahmini bitiş: $daysRemaining gün',
                         style: AppTextStyles.caption,
                       ),
                   ],
@@ -704,7 +704,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               size: 14, color: Colors.grey),
                           const SizedBox(width: 4),
                           Text(
-                            'Tahmini bitis: $daysRemaining gun sonra',
+                            'Tahmini bitiş: $daysRemaining gün sonra',
                             style: AppTextStyles.caption,
                           ),
                         ],
@@ -715,7 +715,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     if ((dailyAvg as num) > 0) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Gunluk ortalama: $dailyAvg ${item['unit']}',
+                        'Günlük ortalama: $dailyAvg ${item['unit']}',
                         style: AppTextStyles.caption,
                       ),
                     ],
@@ -731,7 +731,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     if (reorderPoint != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Yeniden siparis seviyesi: $reorderPoint ${item['unit']}',
+                        'Yeniden sipariş seviyesi: $reorderPoint ${item['unit']}',
                         style: AppTextStyles.caption,
                       ),
                     ],
@@ -745,7 +745,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               size: 14, color: Colors.grey),
                           const SizedBox(width: 4),
                           Text(
-                            'Optimum siparis (EOQ): $eoq ${item['unit']}',
+                            'Optimum sipariş (EOQ): $eoq ${item['unit']}',
                             style: AppTextStyles.caption,
                           ),
                         ],
@@ -754,7 +754,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     if (daysBetween != null && (daysBetween as num) > 0) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Siparis araligi: $daysBetween gun',
+                        'Sipariş aralığı: $daysBetween gün',
                         style: AppTextStyles.caption,
                       ),
                     ],
@@ -768,7 +768,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               size: 14, color: alertColor),
                           const SizedBox(width: 4),
                           Text(
-                            'Onerilen siparis: $suggestedOrder ${item['unit']}',
+                            'Önerilen sipariş: $suggestedOrder ${item['unit']}',
                             style: AppTextStyles.caption.copyWith(
                               color: alertColor,
                               fontWeight: FontWeight.w600,
