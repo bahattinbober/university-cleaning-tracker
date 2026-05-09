@@ -246,6 +246,13 @@ db.serialize(() => {
     )
   `);
 
+  // Eski veritabanları için inventory.unit_cost alanını güvenli ekle
+  db.run(`ALTER TABLE inventory ADD COLUMN unit_cost REAL DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('❌ inventory unit_cost migration hatası:', err.message);
+    }
+  });
+
   // INVENTORY LOGS TABLOSU
   db.run(`
     CREATE TABLE IF NOT EXISTS inventory_logs (

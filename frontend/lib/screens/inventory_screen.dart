@@ -284,6 +284,98 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // ── Cost dialog ──────────────────────────────────────────────────────────
+
+  void _showCostDialog(Map<String, dynamic> item) {
+    final costController = TextEditingController(
+      text: (item['unit_cost'] as num? ?? 0).toString(),
+    );
+    final categoryController = TextEditingController(
+      text: item['category']?.toString() ?? 'Genel',
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Maliyet: ${item['name']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: costController,
+              decoration: const InputDecoration(
+                labelText: 'Birim Maliyet (TL)',
+                hintText: 'Örn: 50.00',
+                prefixText: '₺ ',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: categoryController,
+              decoration: const InputDecoration(
+                labelText: 'Kategori',
+                hintText: 'Örn: Temizlik Sıvısı',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final navigator = Navigator.of(ctx);
+              final messenger = ScaffoldMessenger.of(context);
+              final newCost =
+                  double.tryParse(costController.text);
+              if (newCost == null || newCost < 0) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                      content: Text('Geçerli maliyet girin')),
+                );
+                return;
+              }
+              final prefs =
+                  await SharedPreferences.getInstance();
+              final token = prefs.getString('token');
+              final response = await http.put(
+                Uri.parse(
+                    'http://192.168.1.27:4000/api/inventory/${item['id']}/cost'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $token',
+                },
+                body: jsonEncode({
+                  'unit_cost': newCost,
+                  'category':
+                      categoryController.text.trim(),
+                }),
+              );
+              if (response.statusCode == 200) {
+                navigator.pop();
+                await _fetchInventory();
+                messenger.showSnackBar(
+                  const SnackBar(
+                      content: Text('Maliyet güncellendi')),
+                );
+              } else {
+                messenger.showSnackBar(
+                  const SnackBar(
+                      content:
+                          Text('Güncelleme başarısız')),
+                );
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Alert level helpers ──────────────────────────────────────────────────
 
   Color _alertColor(String? level) {
@@ -606,6 +698,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final suggestedOrder = item['suggested_order'];
     final eoq = item['eoq_optimal_order'];
     final daysBetween = item['days_between_orders'];
+    final unitCost =
+        (item['unit_cost'] as num? ?? 0).toDouble();
+    final estimatedValue =
+        (item['estimated_value'] as num? ?? 0).toDouble();
     final needsOrder = alertLevel == 'reorder' ||
         alertLevel == 'critical' ||
         alertLevel == 'depleted';
@@ -756,6 +852,43 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       Text(
                         'Sipariş aralığı: $daysBetween gün',
                         style: AppTextStyles.caption,
+                      ),
+                    ],
+
+                    // Birim maliyet (admin only)
+                    if (isAdmin) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.attach_money,
+                              size: 14, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              unitCost > 0
+                                  ? 'Birim: ${unitCost.toStringAsFixed(2)} TL  •  '
+                                    'Değer: ${estimatedValue.toStringAsFixed(2)} TL'
+                                  : 'Maliyet girilmemiş (tıkla)',
+                              style: AppTextStyles.caption.copyWith(
+                                color: unitCost > 0
+                                    ? Colors.grey
+                                    : AppColors.warning,
+                                fontStyle: unitCost > 0
+                                    ? FontStyle.normal
+                                    : FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => _showCostDialog(item),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.edit,
+                                  size: 14,
+                                  color: AppColors.primary),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
 

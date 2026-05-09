@@ -140,6 +140,9 @@ router.get('/', (req, res) => {
                     safety_stock_statistical: item.min_threshold,
                     service_level: 95,
                     cost_parameters: { order_cost: ORDER_COST, holding_cost: HOLDING_COST_PER_UNIT },
+                    estimated_value: parseFloat(
+                      ((item.current_amount || 0) * (item.unit_cost || 0)).toFixed(2)
+                    ),
                   });
                   return;
                 }
@@ -191,6 +194,9 @@ router.get('/', (req, res) => {
                   safety_stock_statistical: safetyStockStat,
                   service_level: 95,
                   cost_parameters: { order_cost: ORDER_COST, holding_cost: HOLDING_COST_PER_UNIT },
+                  estimated_value: parseFloat(
+                    ((item.current_amount || 0) * (item.unit_cost || 0)).toFixed(2)
+                  ),
                 });
               }
             );
@@ -292,6 +298,38 @@ router.delete('/:id', ensureAdmin, (req, res) => {
     if (this.changes === 0) return res.status(404).json({ message: 'Malzeme bulunamadı' });
     res.json({ id, deleted: true });
   });
+});
+
+// PUT /api/inventory/:id/cost -> birim maliyet ve kategori güncelle (admin)
+router.put('/:id/cost', ensureAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const { unit_cost, category } = req.body;
+
+  if (typeof unit_cost !== 'number' || unit_cost < 0) {
+    return res.status(400).json({ message: 'Geçerli unit_cost gerekli' });
+  }
+
+  const updates = ['unit_cost = ?'];
+  const params = [unit_cost];
+
+  if (category !== undefined) {
+    updates.push('category = ?');
+    params.push(String(category).trim());
+  }
+
+  params.push(id);
+
+  db.run(
+    `UPDATE inventory SET ${updates.join(', ')} WHERE id = ?`,
+    params,
+    function (err) {
+      if (err) return res.status(500).json({ message: 'DB hatası' });
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'Malzeme bulunamadı' });
+      }
+      res.json({ success: true, unit_cost, category });
+    }
+  );
 });
 
 // GET /api/inventory/:id/forecast -> 30 günlük geçmişten 7 günlük tahmin

@@ -673,6 +673,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                   onTap: () => Navigator.pushNamed(
                       context, '/comparison'),
                 ),
+                if (_userRole == 'admin')
+                  _quickButton(
+                    icon: Icons.account_balance_wallet,
+                    label: 'Bütçe',
+                    color: AppColors.adminAccent,
+                    onTap: () => Navigator.pushNamed(
+                        context, '/budget'),
+                  ),
                 _quickButton(
                   icon: Icons.apps,
                   label: 'Tüm Menü',

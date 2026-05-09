@@ -23,6 +23,7 @@ import 'screens/inventory_methodology_screen.dart';
 import 'screens/main_dashboard_screen.dart';
 import 'screens/heatmap_screen.dart';
 import 'screens/comparison_screen.dart';
+import 'screens/budget_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -62,6 +63,7 @@ class MyApp extends StatelessWidget {
         "/main-dashboard": (context) => const MainDashboardScreen(),
         "/heatmap": (context) => const HeatmapScreen(),
         "/comparison": (context) => const ComparisonScreen(),
+        "/budget": (context) => const BudgetScreen(),
       },
 
       theme: AppTheme.lightTheme,
