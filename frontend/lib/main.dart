@@ -20,6 +20,7 @@ import 'screens/kpi_detail_screen.dart';
 import 'screens/kpi_methodology_screen.dart';
 import 'screens/abc_analysis_screen.dart';
 import 'screens/inventory_methodology_screen.dart';
+import 'screens/main_dashboard_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
         "/abc-analysis": (context) => const AbcAnalysisScreen(),
         "/inventory-methodology": (context) =>
             const InventoryMethodologyScreen(),
+        "/main-dashboard": (context) => const MainDashboardScreen(),
       },
 
       theme: AppTheme.lightTheme,

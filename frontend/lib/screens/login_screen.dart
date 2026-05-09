@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setInt('userId', user['id']);
 
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/main-dashboard');
       } else {
         String message = 'Giriş başarısız! Email veya şifre yanlış.';
         try {
