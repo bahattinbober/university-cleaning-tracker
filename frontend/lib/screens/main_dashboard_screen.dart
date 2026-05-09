@@ -667,6 +667,13 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                       Navigator.pushNamed(context, '/heatmap'),
                 ),
                 _quickButton(
+                  icon: Icons.compare_arrows,
+                  label: 'Karşılaştır',
+                  color: AppColors.success,
+                  onTap: () => Navigator.pushNamed(
+                      context, '/comparison'),
+                ),
+                _quickButton(
                   icon: Icons.apps,
                   label: 'Tüm Menü',
                   color: AppColors.adminAccent,

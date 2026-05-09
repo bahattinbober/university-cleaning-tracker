@@ -221,4 +221,145 @@ router.get('/heatmap', (req, res) => {
   });
 });
 
+// GET /api/cleaning/comparison -> bu hafta vs geçen hafta + bu ay vs geçen ay
+router.get('/comparison', (req, res) => {
+  const userId = req.user?.id;
+  const role = req.user?.role;
+
+  const userFilter = role === 'admin' ? '' : 'AND user_id = ?';
+  const params = role === 'admin' ? [] : [userId];
+
+  const queries = {
+    thisWeek: `SELECT COUNT(*) as count FROM cleaning_logs
+               WHERE cleaned_at >= datetime('now', '-7 days')
+               ${userFilter}`,
+    lastWeek: `SELECT COUNT(*) as count FROM cleaning_logs
+               WHERE cleaned_at >= datetime('now', '-14 days')
+                 AND cleaned_at < datetime('now', '-7 days')
+               ${userFilter}`,
+    thisMonth: `SELECT COUNT(*) as count FROM cleaning_logs
+                WHERE cleaned_at >= datetime('now', '-30 days')
+                ${userFilter}`,
+    lastMonth: `SELECT COUNT(*) as count FROM cleaning_logs
+                WHERE cleaned_at >= datetime('now', '-60 days')
+                  AND cleaned_at < datetime('now', '-30 days')
+                ${userFilter}`,
+  };
+
+  const dailySql = `
+    SELECT
+      DATE(cleaned_at) as day,
+      COUNT(*) as count
+    FROM cleaning_logs
+    WHERE cleaned_at >= datetime('now', '-14 days')
+      ${userFilter}
+    GROUP BY DATE(cleaned_at)
+    ORDER BY day ASC
+  `;
+
+  const results = {};
+  let completed = 0;
+  const total = 5;
+  let errSent = false;
+
+  function checkDone() {
+    completed++;
+    if (completed === total) sendResponse();
+  }
+
+  function fail(err) {
+    if (!errSent) {
+      errSent = true;
+      console.error('Comparison hata:', err.message);
+      res.status(500).json({ message: 'DB hatası' });
+    }
+  }
+
+  function sendResponse() {
+    const thisWeek = results.thisWeek || 0;
+    const lastWeek = results.lastWeek || 0;
+    const thisMonth = results.thisMonth || 0;
+    const lastMonth = results.lastMonth || 0;
+
+    const weekChange = lastWeek > 0
+      ? ((thisWeek - lastWeek) / lastWeek) * 100
+      : (thisWeek > 0 ? 100 : 0);
+    const monthChange = lastMonth > 0
+      ? ((thisMonth - lastMonth) / lastMonth) * 100
+      : (thisMonth > 0 ? 100 : 0);
+
+    function trendOf(change) {
+      if (change > 5) return 'up';
+      if (change < -5) return 'down';
+      return 'stable';
+    }
+
+    const today = new Date();
+    const dailyCompare = [];
+    for (let i = 6; i >= 0; i--) {
+      const thisDate = new Date(today);
+      thisDate.setDate(thisDate.getDate() - i);
+      const lastDate = new Date(today);
+      lastDate.setDate(lastDate.getDate() - i - 7);
+
+      const thisDayStr = thisDate.toISOString().split('T')[0];
+      const lastDayStr = lastDate.toISOString().split('T')[0];
+
+      const thisDayData = (results.daily || []).find(r => r.day === thisDayStr);
+      const lastDayData = (results.daily || []).find(r => r.day === lastDayStr);
+
+      const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+      const dayLabel = dayNames[(thisDate.getDay() + 6) % 7];
+
+      dailyCompare.push({
+        day_label: dayLabel,
+        this_week: thisDayData ? thisDayData.count : 0,
+        last_week: lastDayData ? lastDayData.count : 0,
+      });
+    }
+
+    res.json({
+      week: {
+        this: thisWeek,
+        last: lastWeek,
+        change_pct: parseFloat(weekChange.toFixed(1)),
+        trend: trendOf(weekChange),
+      },
+      month: {
+        this: thisMonth,
+        last: lastMonth,
+        change_pct: parseFloat(monthChange.toFixed(1)),
+        trend: trendOf(monthChange),
+      },
+      daily_comparison: dailyCompare,
+    });
+  }
+
+  db.get(queries.thisWeek, params, (err, row) => {
+    if (err) return fail(err);
+    results.thisWeek = row?.count || 0;
+    checkDone();
+  });
+  db.get(queries.lastWeek, params, (err, row) => {
+    if (err) return fail(err);
+    results.lastWeek = row?.count || 0;
+    checkDone();
+  });
+  db.get(queries.thisMonth, params, (err, row) => {
+    if (err) return fail(err);
+    results.thisMonth = row?.count || 0;
+    checkDone();
+  });
+  db.get(queries.lastMonth, params, (err, row) => {
+    if (err) return fail(err);
+    results.lastMonth = row?.count || 0;
+    checkDone();
+  });
+  db.all(dailySql, params, (err, rows) => {
+    if (err) return fail(err);
+    results.daily = rows || [];
+    checkDone();
+  });
+});
+
 module.exports = router;
