@@ -660,6 +660,13 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                         context, '/inventory'),
                   ),
                 _quickButton(
+                  icon: Icons.grid_4x4,
+                  label: 'Yoğunluk',
+                  color: AppColors.error,
+                  onTap: () =>
+                      Navigator.pushNamed(context, '/heatmap'),
+                ),
+                _quickButton(
                   icon: Icons.apps,
                   label: 'Tüm Menü',
                   color: AppColors.adminAccent,

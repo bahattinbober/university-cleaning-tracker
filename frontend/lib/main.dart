@@ -21,6 +21,7 @@ import 'screens/kpi_methodology_screen.dart';
 import 'screens/abc_analysis_screen.dart';
 import 'screens/inventory_methodology_screen.dart';
 import 'screens/main_dashboard_screen.dart';
+import 'screens/heatmap_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -58,6 +59,7 @@ class MyApp extends StatelessWidget {
         "/inventory-methodology": (context) =>
             const InventoryMethodologyScreen(),
         "/main-dashboard": (context) => const MainDashboardScreen(),
+        "/heatmap": (context) => const HeatmapScreen(),
       },
 
       theme: AppTheme.lightTheme,

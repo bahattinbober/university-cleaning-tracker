@@ -145,4 +145,80 @@ router.get('/', (req, res) => {
   });
 });
 
+// GET /api/cleaning/heatmap -> gün×saat yoğunluk haritası
+router.get('/heatmap', (req, res) => {
+  const userId = req.user?.id;
+  const role = req.user?.role;
+
+  const sql = role === 'admin'
+    ? `SELECT cleaned_at FROM cleaning_logs
+       WHERE cleaned_at >= datetime('now', '-30 days')`
+    : `SELECT cleaned_at FROM cleaning_logs
+       WHERE user_id = ?
+         AND cleaned_at >= datetime('now', '-30 days')`;
+
+  const params = role === 'admin' ? [] : [userId];
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ message: 'DB hatası' });
+
+    // 7 gün × 5 saat dilimi: 06-09, 09-12, 12-15, 15-18, 18-21
+    const grid = Array.from({ length: 7 }, () =>
+      Array.from({ length: 5 }, () => 0)
+    );
+
+    const slotForHour = (hour) => {
+      if (hour >= 6 && hour < 9) return 0;
+      if (hour >= 9 && hour < 12) return 1;
+      if (hour >= 12 && hour < 15) return 2;
+      if (hour >= 15 && hour < 18) return 3;
+      if (hour >= 18 && hour < 21) return 4;
+      return -1;
+    };
+
+    let total = 0;
+    let maxValue = 0;
+
+    rows.forEach((row) => {
+      const dt = new Date(row.cleaned_at);
+      const dayOfWeek = (dt.getDay() + 6) % 7; // Pzt=0, Paz=6
+      const hour = dt.getHours();
+      const slot = slotForHour(hour);
+
+      if (slot >= 0) {
+        grid[dayOfWeek][slot]++;
+        total++;
+        if (grid[dayOfWeek][slot] > maxValue) {
+          maxValue = grid[dayOfWeek][slot];
+        }
+      }
+    });
+
+    let peakDay = -1, peakSlot = -1, peakValue = 0;
+    for (let d = 0; d < 7; d++) {
+      for (let s = 0; s < 5; s++) {
+        if (grid[d][s] > peakValue) {
+          peakValue = grid[d][s];
+          peakDay = d;
+          peakSlot = s;
+        }
+      }
+    }
+
+    res.json({
+      grid,
+      total,
+      max_value: maxValue,
+      day_labels: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
+      slot_labels: ['06-09', '09-12', '12-15', '15-18', '18-21'],
+      peak: peakValue > 0 ? {
+        day: peakDay,
+        slot: peakSlot,
+        value: peakValue,
+      } : null,
+      period_days: 30,
+    });
+  });
+});
+
 module.exports = router;
