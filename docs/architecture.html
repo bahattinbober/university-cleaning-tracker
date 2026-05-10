@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Sistem Mimarisi - Şekil 1</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 20px; background: white; color: #1a1a1a; }
+  h1 { text-align: center; color: #1565c0; border-bottom: 3px solid #1565c0; padding-bottom: 10px; }
+  .figure-caption { text-align: center; font-style: italic; color: #666; margin: 10px 0 30px 0; }
+  .layer { border: 2px solid; border-radius: 12px; padding: 20px; margin: 20px 0; }
+  .frontend { background: #e3f2fd; border-color: #1976d2; }
+  .backend  { background: #fff3e0; border-color: #f57c00; }
+  .database { background: #f3e5f5; border-color: #7b1fa2; }
+  .layer-title { font-size: 18px; font-weight: bold; margin-bottom: 12px; }
+  .components { display: flex; flex-wrap: wrap; gap: 10px; }
+  .component { background: white; border: 1px solid currentColor; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+  .arrow    { text-align: center; font-size: 24px; color: #666; margin: -10px 0; }
+  .protocol { text-align: center; font-size: 11px; color: #999; margin-top: -5px; }
+  .legend   { margin-top: 40px; padding: 15px; background: #f5f5f5; border-radius: 8px; font-size: 13px; }
+  .legend-item { margin: 5px 0; }
+</style>
+</head>
+<body>
+<h1>Şekil 1: Sistem Mimarisi</h1>
+<p class="figure-caption">Üç katmanlı (3-tier) istemci-sunucu mimarisi</p>
+
+<div class="layer frontend">
+  <div class="layer-title">📱 SUNUM KATMANI (Presentation Layer)</div>
+  <div style="margin-bottom: 8px; font-size: 13px; color: #555;">Flutter Mobile Application (Dart)</div>
+  <div class="components">
+    <div class="component">🏠 Ana Dashboard</div>
+    <div class="component">📊 KPI Detay</div>
+    <div class="component">📦 Stok Yönetimi</div>
+    <div class="component">💰 Bütçe / Maliyet</div>
+    <div class="component">📈 Heatmap</div>
+    <div class="component">🔄 Karşılaştırma</div>
+    <div class="component">🔮 Talep Tahmini</div>
+    <div class="component">📷 QR Temizlik Kayıt</div>
+    <div class="component">📚 Metodoloji</div>
+  </div>
+</div>
+
+<div class="arrow">⇅</div>
+<div class="protocol">HTTPS / REST API &nbsp;•&nbsp; JWT Authentication</div>
+<div class="arrow">⇅</div>
+
+<div class="layer backend">
+  <div class="layer-title">⚙️ İŞ MANTIĞI KATMANI (Business Logic Layer)</div>
+  <div style="margin-bottom: 8px; font-size: 13px; color: #555;">Node.js + Express.js REST API</div>
+  <div class="components">
+    <div class="component">/api/auth</div>
+    <div class="component">/api/cleaning</div>
+    <div class="component">/api/inventory</div>
+    <div class="component">/api/kpi</div>
+    <div class="component">/api/budget</div>
+    <div class="component">/api/tasks</div>
+    <div class="component">/api/rooms</div>
+    <div class="component">/api/admin</div>
+  </div>
+  <div style="margin-top: 12px; font-size: 12px;">
+    <strong>Middleware:</strong> JWT Auth &nbsp;•&nbsp; Rate Limiter &nbsp;•&nbsp; Admin Guard &nbsp;•&nbsp; CORS &nbsp;•&nbsp; Multer
+  </div>
+</div>
+
+<div class="arrow">⇅</div>
+<div class="protocol">SQL Queries &nbsp;•&nbsp; sqlite3 (callback-based)</div>
+<div class="arrow">⇅</div>
+
+<div class="layer database">
+  <div class="layer-title">💾 VERİ KATMANI (Data Layer)</div>
+  <div style="margin-bottom: 8px; font-size: 13px; color: #555;">SQLite 3 — Gömülü Veritabanı (temizlik_sistemi.sqlite)</div>
+  <div class="components">
+    <div class="component">users</div>
+    <div class="component">locations</div>
+    <div class="component">rooms</div>
+    <div class="component">cleaning_logs</div>
+    <div class="component">scheduled_tasks</div>
+    <div class="component">inventory</div>
+    <div class="component">inventory_logs</div>
+    <div class="component">kpi_targets</div>
+  </div>
+</div>
+
+<div class="legend">
+  <strong>📌 Mimari Notları:</strong>
+  <div class="legend-item">• Stateless backend — JWT ile kimlik doğrulama, sunucu tarafı oturum yok</div>
+  <div class="legend-item">• REST API standartları — HTTP fiilleri (GET/POST/PUT/DELETE), JSON payload</div>
+  <div class="legend-item">• Role-based access control — admin ve personel rolleri, ayrı yetki seviyeleri</div>
+  <div class="legend-item">• Rate limiting — aşırı istek koruması (express-rate-limit)</div>
+  <div class="legend-item">• Şifreler bcrypt ile hash'lenir (10 round salt)</div>
+  <div class="legend-item">• CORS whitelist — yalnızca ALLOWED_ORIGINS'teki kaynaklara izin verilir</div>
+  <div class="legend-item">• Fail-fast başlatma — JWT_SECRET eksikse process.exit(1) çağrılır</div>
+</div>
+</body>
+</html>

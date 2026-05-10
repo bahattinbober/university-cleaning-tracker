@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Veritabanı Şeması - Şekil 2</title>
+<style>
+  body { font-family: 'Courier New', monospace; max-width: 1400px; margin: 40px auto; padding: 20px; background: white; }
+  h1, h2 { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; }
+  h1 { text-align: center; color: #1565c0; border-bottom: 3px solid #1565c0; padding-bottom: 10px; }
+  .figure-caption { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; text-align: center; font-style: italic; color: #666; margin: 10px 0 30px 0; }
+  .erd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .table { border: 2px solid #1565c0; border-radius: 8px; overflow: hidden; background: white; }
+  .table-header { background: #1565c0; color: white; padding: 10px 14px; font-weight: bold; font-size: 15px; font-family: -apple-system, 'Segoe UI', Arial, sans-serif; }
+  .table-row { padding: 6px 10px; border-bottom: 1px solid #e0e0e0; font-size: 12px; display: flex; align-items: baseline; gap: 6px; }
+  .table-row:last-child { border-bottom: none; }
+  .pk { background: #fff3e0; }
+  .fk { background: #e8f5e9; }
+  .col-name { min-width: 165px; font-weight: bold; color: #1a1a1a; }
+  .col-type { color: #1976d2; min-width: 170px; }
+  .col-note { color: #888; font-size: 11px; font-style: italic; }
+  .relationships { margin-top: 40px; padding: 20px; background: #f5f5f5; border-radius: 8px; font-family: -apple-system, 'Segoe UI', Arial, sans-serif; }
+  .rel-line { padding: 5px 0; font-size: 14px; border-bottom: 1px solid #e0e0e0; }
+  .rel-line:last-child { border-bottom: none; }
+  .legend { margin-top: 24px; font-family: -apple-system, 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #555; display: flex; gap: 24px; align-items: center; }
+  .legend-box { display: inline-block; width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; border-radius: 3px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<h1>Şekil 2: Veritabanı Şeması (ERD)</h1>
+<p class="figure-caption">Entity Relationship Diagram — SQLite 3 &nbsp;·&nbsp; Kaynak: backend/backend/src/db.js</p>
+
+<div class="erd-grid">
+
+  <!-- users -->
+  <div class="table">
+    <div class="table-header">👤 users</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">name</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">email</span>
+      <span class="col-type">TEXT UNIQUE</span>
+      <span class="col-note">@pau.edu.tr zorunlu</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">password_hash</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">bcrypt 10-round</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">role</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">admin / staff</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">employee_no</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">department</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">approval_status</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">pending / approved / rejected</span>
+    </div>
+  </div>
+
+  <!-- locations -->
+  <div class="table">
+    <div class="table-header">📍 locations</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">name</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">description</span>
+      <span class="col-type">TEXT</span>
+    </div>
+  </div>
+
+  <!-- rooms -->
+  <div class="table">
+    <div class="table-header">🚪 rooms</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 location_id</span>
+      <span class="col-type">INTEGER FK</span>
+      <span class="col-note">→ locations.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">name</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">description</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">latitude</span>
+      <span class="col-type">REAL</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">longitude</span>
+      <span class="col-type">REAL</span>
+    </div>
+  </div>
+
+  <!-- cleaning_logs -->
+  <div class="table">
+    <div class="table-header">🧹 cleaning_logs</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 user_id</span>
+      <span class="col-type">INTEGER FK</span>
+      <span class="col-note">→ users.id</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 room_id</span>
+      <span class="col-type">INTEGER FK</span>
+      <span class="col-note">→ rooms.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">cleaned_at</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT datetime('now')</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">status</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">notes</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">image</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">base64 encoded</span>
+    </div>
+  </div>
+
+  <!-- scheduled_tasks -->
+  <div class="table">
+    <div class="table-header">📅 scheduled_tasks</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 room_id</span>
+      <span class="col-type">INTEGER FK NOT NULL</span>
+      <span class="col-note">→ rooms.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">title</span>
+      <span class="col-type">TEXT NOT NULL</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">description</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">scheduled_for</span>
+      <span class="col-type">TEXT NOT NULL</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 assigned_user_id</span>
+      <span class="col-type">INTEGER FK</span>
+      <span class="col-note">→ users.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">status</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT 'pending'</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 completed_log_id</span>
+      <span class="col-type">INTEGER FK</span>
+      <span class="col-note">→ cleaning_logs.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">created_at</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT datetime('now')</span>
+    </div>
+  </div>
+
+  <!-- inventory -->
+  <div class="table">
+    <div class="table-header">📦 inventory</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">name</span>
+      <span class="col-type">TEXT NOT NULL</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">unit</span>
+      <span class="col-type">TEXT NOT NULL</span>
+      <span class="col-note">litre, adet, kg …</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">current_amount</span>
+      <span class="col-type">REAL NOT NULL</span>
+      <span class="col-note">DEFAULT 0</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">min_threshold</span>
+      <span class="col-type">REAL NOT NULL</span>
+      <span class="col-note">DEFAULT 0</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">unit_cost</span>
+      <span class="col-type">REAL</span>
+      <span class="col-note">DEFAULT 0 (ABC maliyet)</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">category</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">created_at</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT datetime('now')</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">updated_at</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT datetime('now')</span>
+    </div>
+  </div>
+
+  <!-- inventory_logs -->
+  <div class="table">
+    <div class="table-header">📋 inventory_logs</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 inventory_id</span>
+      <span class="col-type">INTEGER FK NOT NULL</span>
+      <span class="col-note">→ inventory.id (CASCADE)</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 user_id</span>
+      <span class="col-type">INTEGER FK</span>
+      <span class="col-note">→ users.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">action</span>
+      <span class="col-type">TEXT NOT NULL</span>
+      <span class="col-note">in / out / adjust</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">amount</span>
+      <span class="col-type">REAL NOT NULL</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">note</span>
+      <span class="col-type">TEXT</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">created_at</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT datetime('now')</span>
+    </div>
+  </div>
+
+  <!-- kpi_targets -->
+  <div class="table">
+    <div class="table-header">🎯 kpi_targets</div>
+    <div class="table-row pk">
+      <span class="col-name">🔑 id</span>
+      <span class="col-type">INTEGER PK AUTO</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 user_id</span>
+      <span class="col-type">INTEGER FK NOT NULL UNIQUE</span>
+      <span class="col-note">→ users.id</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">target_value</span>
+      <span class="col-type">INTEGER NOT NULL</span>
+      <span class="col-note">DEFAULT 15</span>
+    </div>
+    <div class="table-row fk">
+      <span class="col-name">🔗 set_by</span>
+      <span class="col-type">INTEGER FK NOT NULL</span>
+      <span class="col-note">→ users.id (admin)</span>
+    </div>
+    <div class="table-row">
+      <span class="col-name">set_at</span>
+      <span class="col-type">TEXT</span>
+      <span class="col-note">DEFAULT datetime('now')</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="relationships">
+  <h2 style="margin-top: 0; color: #1565c0;">🔗 İlişkiler (Relationships)</h2>
+
+  <div class="rel-line">
+    <strong>locations (1) ────&lt; (N) rooms</strong>
+    <span style="color: #666;"> — Bir konumda birden fazla oda bulunabilir</span>
+  </div>
+  <div class="rel-line">
+    <strong>users (1) ────&lt; (N) cleaning_logs</strong>
+    <span style="color: #666;"> — Bir personel birçok temizlik kaydı oluşturabilir</span>
+  </div>
+  <div class="rel-line">
+    <strong>rooms (1) ────&lt; (N) cleaning_logs</strong>
+    <span style="color: #666;"> — Bir oda birçok kez temizlenebilir</span>
+  </div>
+  <div class="rel-line">
+    <strong>rooms (1) ────&lt; (N) scheduled_tasks</strong>
+    <span style="color: #666;"> — Bir odaya birden fazla görev planlanabilir</span>
+  </div>
+  <div class="rel-line">
+    <strong>users (1) ────&lt; (N) scheduled_tasks</strong>
+    <span style="color: #666;"> — Bir kullanıcıya birden fazla görev atanabilir</span>
+  </div>
+  <div class="rel-line">
+    <strong>cleaning_logs (1) ────o (1) scheduled_tasks</strong>
+    <span style="color: #666;"> — Görev tamamlandığında ilgili log ile eşleştirilir</span>
+  </div>
+  <div class="rel-line">
+    <strong>inventory (1) ────&lt; (N) inventory_logs</strong>
+    <span style="color: #666;"> — Malzemenin tüm giriş/çıkış hareketleri (CASCADE DELETE)</span>
+  </div>
+  <div class="rel-line">
+    <strong>users (1) ────&lt; (N) inventory_logs</strong>
+    <span style="color: #666;"> — Stok hareketi yapan kullanıcı kaydı</span>
+  </div>
+  <div class="rel-line">
+    <strong>users (1) ────o (1) kpi_targets</strong>
+    <span style="color: #666;"> — Her kullanıcı için en fazla bir KPI hedefi (UNIQUE)</span>
+  </div>
+  <div class="rel-line">
+    <strong>users (admin, 1) ────&lt; (N) kpi_targets</strong>
+    <span style="color: #666;"> — Hedefi belirleyen admin (set_by FK)</span>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="legend-box" style="background: #fff3e0;"></span> Primary Key (Birincil Anahtar)</span>
+  <span><span class="legend-box" style="background: #e8f5e9;"></span> Foreign Key (Yabancı Anahtar)</span>
+  <span style="color: #888; font-size: 12px;">Kaynak: backend/backend/src/db.js — gerçek CREATE TABLE ifadelerinden türetilmiştir</span>
+</div>
+</body>
+</html>
