@@ -1187,4 +1187,807 @@ class PdfReportService {
           pw.Text(text, style: const pw.TextStyle(fontSize: 9)),
     );
   }
+
+  // ── Yillik Yonetim Raporu (4 sayfa A4) ───────────────────────────────────
+
+  static Future<List<int>> generateMasterReport({
+    required Map<String, dynamic> kpiData,
+    required List<Map<String, dynamic>> inventoryItems,
+    required Map<String, dynamic> budgetSummary,
+    required Map<String, dynamic> trendData,
+  }) async {
+    final pdf = pw.Document();
+    final fontRegular = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+    final logoBytes = await rootBundle.load('assets/images/pau-logo.png');
+    final logo = pw.MemoryImage(logoBytes.buffer.asUint8List());
+    final theme = pw.ThemeData.withFont(base: fontRegular, bold: fontBold);
+
+    final now = DateTime.now();
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
+
+    // KPI
+    final score = kpiData['overall_score'] as int? ?? 0;
+    final grade = kpiData['grade']?.toString() ?? 'N/A';
+    final levelMap = kpiData['level'] as Map<String, dynamic>?;
+    final levelName = levelMap?['name']?.toString() ?? '';
+    final components = kpiData['components'] as Map<String, dynamic>? ?? {};
+    final stats = kpiData['stats'] as Map<String, dynamic>? ?? {};
+    final benchmark = kpiData['benchmark'] as Map<String, dynamic>? ?? {};
+    final achievements =
+        kpiData['achievements'] as Map<String, dynamic>? ?? {};
+    final userMap = kpiData['user'] as Map<String, dynamic>? ?? {};
+    final userName = userMap['name']?.toString() ?? 'Yonetici';
+
+    // Stok
+    final totalItems = inventoryItems.length;
+    final orderCount = inventoryItems
+        .where((i) =>
+            i['alert_level'] == 'reorder' ||
+            i['alert_level'] == 'critical' ||
+            i['alert_level'] == 'depleted')
+        .length;
+    double totalValue = 0;
+    for (final item in inventoryItems) {
+      totalValue += ((item['current_amount'] as num? ?? 0) *
+              (item['unit_cost'] as num? ?? 0))
+          .toDouble();
+    }
+
+    // Butce
+    final monthlyCost = (budgetSummary['total_cost'] as num? ??
+            budgetSummary['monthly_cost'] as num? ??
+            budgetSummary['total'] as num? ??
+            0)
+        .toDouble();
+    final trendList = ((trendData['trend'] as List?) ??
+            (trendData['data'] as List?) ??
+            [])
+        .cast<Map<String, dynamic>>();
+
+    final scoreColor = score >= 80
+        ? PdfColors.green700
+        : score >= 60
+            ? PdfColors.blue700
+            : score >= 40
+                ? PdfColors.orange700
+                : PdfColors.red700;
+
+    // Basari ozeti
+    final completedCount = achievements['completed_count'] as int? ?? 0;
+    final totalCount = achievements['total_count'] as int? ?? 8;
+    final rate = totalCount > 0 ? (completedCount * 100 ~/ totalCount) : 0;
+
+    // Top 10 - deger sirasina gore
+    final sortedByValue = List<Map<String, dynamic>>.from(inventoryItems)
+      ..sort((a, b) {
+        final av = ((a['current_amount'] as num? ?? 0) *
+                (a['unit_cost'] as num? ?? 0))
+            .toDouble();
+        final bv = ((b['current_amount'] as num? ?? 0) *
+                (b['unit_cost'] as num? ?? 0))
+            .toDouble();
+        return bv.compareTo(av);
+      });
+    final top10 = sortedByValue.take(10).toList();
+    final top5Cost = sortedByValue.take(5).toList();
+    final orderList = inventoryItems
+        .where((i) =>
+            i['alert_level'] == 'reorder' ||
+            i['alert_level'] == 'critical' ||
+            i['alert_level'] == 'depleted')
+        .toList();
+
+    // Kategori maliyetleri
+    final catCosts = <String, double>{};
+    for (final item in inventoryItems) {
+      final cat = item['category']?.toString() ?? 'Diger';
+      final val = ((item['current_amount'] as num? ?? 0) *
+              (item['unit_cost'] as num? ?? 0))
+          .toDouble();
+      catCosts[cat] = (catCosts[cat] ?? 0) + val;
+    }
+    final sortedCats = catCosts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // ── SAYFA 1: KAPAK ──────────────────────────────────────────────────────
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      theme: theme,
+      build: (ctx) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            children: [
+              pw.Container(
+                  width: 70,
+                  height: 70,
+                  child: pw.Image(logo, fit: pw.BoxFit.contain)),
+              pw.SizedBox(width: 20),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('PAMUKKALE UNIVERSITESI',
+                        style: pw.TextStyle(
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.blueGrey800)),
+                    pw.Text('Bilgisayar Muhendisligi Bolumu',
+                        style: const pw.TextStyle(
+                            fontSize: 9, color: PdfColors.blueGrey600)),
+                    pw.SizedBox(height: 8),
+                    pw.Text('YILLIK YONETIM RAPORU',
+                        style: pw.TextStyle(
+                            fontSize: 22,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.blue800)),
+                    pw.Text('Universite Personel Calisma Takip Sistemi',
+                        style: const pw.TextStyle(
+                            fontSize: 10, color: PdfColors.blueGrey600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 6),
+          pw.Container(height: 2, color: PdfColors.blue800),
+          pw.SizedBox(height: 16),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius:
+                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _kvRow('Tarih', dateStr),
+                    _kvRow('Hazirlayan', userName),
+                    _kvRow('Surum', '1.0'),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _kvRow('Donem', '2025-2026 Bahar'),
+                    _kvRow('Kurum', 'PAU Muhendislik'),
+                    _kvRow('Siniflandirma', 'Kurumsal'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 16),
+          _sectionTitle('YONETICI OZETI'),
+          pw.SizedBox(height: 10),
+          pw.Row(
+            children: [
+              _masterSummaryBox('KPI SKORU', '$score / 100',
+                  '$grade - $levelName', scoreColor),
+              pw.SizedBox(width: 8),
+              _masterSummaryBox('STOK DURUMU', '$totalItems kalem',
+                  '$orderCount siparis/kritik', PdfColors.blue700),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Row(
+            children: [
+              _masterSummaryBox(
+                  'TOPLAM DEGER',
+                  '${totalValue.toStringAsFixed(0)} TL',
+                  'Stok envanter degeri',
+                  PdfColors.green700),
+              pw.SizedBox(width: 8),
+              _masterSummaryBox(
+                  'AYLIK MALIYET',
+                  '${monthlyCost.toStringAsFixed(0)} TL',
+                  '30 gun tuketim maliyeti',
+                  PdfColors.orange700),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          _sectionTitle('AKADEMIK DAYANAKLAR'),
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blue50,
+              borderRadius:
+                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _refRow('Kaplan & Norton (1992)',
+                    'Balanced Scorecard - Performans Yonetimi'),
+                _refRow('Locke & Latham (1990)',
+                    'Goal-Setting Theory - Hedef Belirleme'),
+                _refRow('Doran (1981)', 'SMART Goals - Akilli Hedefler'),
+                _refRow('Harris (1913), Wilson (1934)',
+                    'EOQ Modeli - Optimum Siparis Miktari'),
+                _refRow(
+                    'Pareto (1906)', 'ABC Analizi - Stok Siniflandirmasi'),
+                _refRow(
+                    'Brown (1956)', 'Exponential Smoothing - Talep Tahmini'),
+                _refRow(
+                    'Ohno (1988)', 'Toyota Production System - JIT Felsefesi'),
+                _refRow('Kaplan & Cooper (1988)',
+                    'Activity-Based Costing - Faaliyet Maliyetleme'),
+                _refRow('Skinner (1953)',
+                    'Behavioral Reinforcement - Davranis Pekistirme'),
+                _refRow('ISO 9001:2015', 'Kalite Yonetim Standartlari'),
+                _refRow('Tufte (1983)',
+                    'Visual Display of Quantitative Information'),
+                _refRow('Z-Score (Gaussian)',
+                    'Istatistiksel Kiyaslama ve Emniyet Stogu'),
+              ],
+            ),
+          ),
+          pw.Spacer(),
+          pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Sayfa 1 / 4  |  YILLIK YONETIM RAPORU  |  $dateStr',
+              style: const pw.TextStyle(
+                  fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+        ],
+      ),
+    ));
+
+    // ── SAYFA 2: KPI DETAY ──────────────────────────────────────────────────
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      theme: theme,
+      build: (ctx) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('YILLIK YONETIM RAPORU',
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey500)),
+              pw.Text(dateStr,
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey500)),
+            ],
+          ),
+          pw.Container(height: 1, color: PdfColors.grey300),
+          pw.SizedBox(height: 12),
+          _sectionTitle('1. PERFORMANS YONETIMI (KPI)'),
+          pw.SizedBox(height: 4),
+          pw.Text('Kaplan & Norton (1992) Balanced Scorecard Metodolojisi',
+              style: const pw.TextStyle(
+                  fontSize: 9, color: PdfColors.blueGrey600)),
+          pw.SizedBox(height: 14),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(14),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: scoreColor, width: 1.5),
+              borderRadius:
+                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Container(
+                  width: 80,
+                  height: 80,
+                  decoration: pw.BoxDecoration(
+                      color: scoreColor, shape: pw.BoxShape.circle),
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(
+                    '$score',
+                    style: pw.TextStyle(
+                        fontSize: 30,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white),
+                  ),
+                ),
+                pw.SizedBox(width: 20),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('GENEL PERFORMANS SKORU',
+                        style: const pw.TextStyle(
+                            fontSize: 9, color: PdfColors.grey600)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('$score / 100',
+                        style: pw.TextStyle(
+                            fontSize: 22,
+                            fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Harf Notu: $grade',
+                        style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                            color: scoreColor)),
+                    if (levelName.isNotEmpty)
+                      pw.Text(levelName,
+                          style: const pw.TextStyle(
+                              fontSize: 10,
+                              color: PdfColors.blueGrey600)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
+          _sectionTitle('4 BILESEN ANALIZI - BALANCED SCORECARD'),
+          pw.SizedBox(height: 8),
+          _componentTable(components),
+          pw.SizedBox(height: 14),
+          _sectionTitle('ISTATISTIKSEL KIYASLAMA VE HEDEF'),
+          pw.SizedBox(height: 8),
+          _benchmarkTable(stats, benchmark),
+          pw.SizedBox(height: 14),
+          _sectionTitle('BASARI GOSTERGELERI OZETI'),
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius:
+                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: [
+                _statPill(
+                    'Tamamlanan', '$completedCount', PdfColors.green700),
+                _statPill('Toplam', '$totalCount', PdfColors.blue700),
+                _statPill('Basari', '%$rate', PdfColors.orange700),
+              ],
+            ),
+          ),
+          pw.Spacer(),
+          pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Sayfa 2 / 4  |  YILLIK YONETIM RAPORU  |  $dateStr',
+              style: const pw.TextStyle(
+                  fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+        ],
+      ),
+    ));
+
+    // ── SAYFA 3: ENVANTER ────────────────────────────────────────────────────
+    final normalCount =
+        inventoryItems.where((i) => i['alert_level'] == 'normal').length;
+    final reorderCount =
+        inventoryItems.where((i) => i['alert_level'] == 'reorder').length;
+    final criticalCount = inventoryItems
+        .where((i) =>
+            i['alert_level'] == 'critical' ||
+            i['alert_level'] == 'depleted')
+        .length;
+
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      theme: theme,
+      build: (ctx) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('YILLIK YONETIM RAPORU',
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey500)),
+              pw.Text(dateStr,
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey500)),
+            ],
+          ),
+          pw.Container(height: 1, color: PdfColors.grey300),
+          pw.SizedBox(height: 12),
+          _sectionTitle('2. ENVANTER YONETIMI'),
+          pw.SizedBox(height: 4),
+          pw.Text(
+              'Wilson (1934) ROP+EOQ  |  Pareto (1906) ABC  |  Ohno (1988) JIT',
+              style: const pw.TextStyle(
+                  fontSize: 9, color: PdfColors.blueGrey600)),
+          pw.SizedBox(height: 12),
+          pw.Row(
+            children: [
+              _invSummaryBox('Toplam', '$totalItems', PdfColors.blue700),
+              pw.SizedBox(width: 6),
+              _invSummaryBox('Normal', '$normalCount', PdfColors.green700),
+              pw.SizedBox(width: 6),
+              _invSummaryBox(
+                  'Siparis', '$reorderCount', PdfColors.orange700),
+              pw.SizedBox(width: 6),
+              _invSummaryBox(
+                  'Kritik', '$criticalCount', PdfColors.red700),
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          _sectionTitle('EN DEGERLI 10 KALEM'),
+          pw.SizedBox(height: 6),
+          _masterInvTopTable(top10),
+          if (orderList.isNotEmpty) ...[
+            pw.SizedBox(height: 12),
+            _sectionTitle('SIPARIS ONERILERI (Wilson EOQ)'),
+            pw.SizedBox(height: 6),
+            _invOrderTable(orderList.take(8).toList()),
+          ],
+          pw.Spacer(),
+          pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Sayfa 3 / 4  |  YILLIK YONETIM RAPORU  |  $dateStr',
+              style: const pw.TextStyle(
+                  fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+        ],
+      ),
+    ));
+
+    // ── SAYFA 4: BÜTÇE + KAPANIS ────────────────────────────────────────────
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      theme: theme,
+      build: (ctx) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('YILLIK YONETIM RAPORU',
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey500)),
+              pw.Text(dateStr,
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey500)),
+            ],
+          ),
+          pw.Container(height: 1, color: PdfColors.grey300),
+          pw.SizedBox(height: 12),
+          _sectionTitle('3. MALIYET YONETIMI'),
+          pw.SizedBox(height: 4),
+          pw.Text(
+              'Kaplan & Cooper (1988) Activity-Based Costing (ABC Maliyetleme)',
+              style: const pw.TextStyle(
+                  fontSize: 9, color: PdfColors.blueGrey600)),
+          pw.SizedBox(height: 12),
+          pw.Row(
+            children: [
+              _masterSummaryBox(
+                  'TOPLAM STOK DEGERI',
+                  '${totalValue.toStringAsFixed(0)} TL',
+                  'Mevcut envanter degeri',
+                  PdfColors.blue700),
+              pw.SizedBox(width: 8),
+              _masterSummaryBox(
+                  '30 GUN TUKETIM',
+                  '${monthlyCost.toStringAsFixed(0)} TL',
+                  'Aylik faaliyet maliyeti',
+                  PdfColors.orange700),
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          if (trendList.isNotEmpty) ...[
+            _sectionTitle('6 AYLIK MALIYET TRENDI'),
+            pw.SizedBox(height: 6),
+            _masterTrendTable(trendList),
+            pw.SizedBox(height: 12),
+          ],
+          _sectionTitle('TOP 5 MALIYETLI KALEM'),
+          pw.SizedBox(height: 6),
+          _masterCostTable(top5Cost),
+          if (sortedCats.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            _sectionTitle('KATEGORI BAZLI MALIYET DAGILIMI'),
+            pw.SizedBox(height: 6),
+            _masterCatTable(sortedCats),
+          ],
+          pw.SizedBox(height: 12),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blue50,
+              border: pw.Border.all(color: PdfColors.blue200, width: 0.5),
+              borderRadius:
+                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Akademik Entegrasyon Notu',
+                    style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue800)),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Bu sistem, Kaplan\'in iki temel yonetim modelini butunlestirmektedir:\n'
+                  'BSC (Balanced Scorecard, 1992) performans olcumu icin;\n'
+                  'ABC (Activity-Based Costing, 1988) maliyet analizi icin kullanilmaktadir.\n'
+                  'Bu entegrasyon, yonetim kararlari icin butuncul bir veri altyapisi saglar.',
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.blueGrey700),
+                ),
+              ],
+            ),
+          ),
+          pw.Spacer(),
+          pw.Row(
+            children: [
+              pw.Expanded(child: _signatureBox('Hazirlayan')),
+              pw.SizedBox(width: 20),
+              pw.Expanded(child: _signatureBox('Onaylayan')),
+            ],
+          ),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Sayfa 4 / 4  |  YILLIK YONETIM RAPORU  |  $dateStr',
+              style: const pw.TextStyle(
+                  fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+        ],
+      ),
+    ));
+
+    return pdf.save();
+  }
+
+  // ── Master Report Helpers ─────────────────────────────────────────────────
+
+  static pw.Widget _masterSummaryBox(
+      String title, String value, String subtitle, PdfColor color) {
+    return pw.Expanded(
+      child: pw.Container(
+        padding: const pw.EdgeInsets.all(12),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: color, width: 1.5),
+          borderRadius:
+              const pw.BorderRadius.all(pw.Radius.circular(4)),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(title,
+                style: pw.TextStyle(
+                    fontSize: 8,
+                    color: PdfColors.grey600,
+                    letterSpacing: 0.5)),
+            pw.SizedBox(height: 6),
+            pw.Text(value,
+                style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    color: color)),
+            pw.SizedBox(height: 2),
+            pw.Text(subtitle,
+                style: const pw.TextStyle(
+                    fontSize: 8, color: PdfColors.grey600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static pw.Widget _refRow(String author, String description) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: 4,
+            height: 4,
+            margin: const pw.EdgeInsets.only(top: 3, right: 6),
+            decoration: const pw.BoxDecoration(
+                color: PdfColors.blue700, shape: pw.BoxShape.circle),
+          ),
+          pw.SizedBox(
+            width: 160,
+            child: pw.Text(author,
+                style: pw.TextStyle(
+                    fontSize: 9, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.Expanded(
+            child: pw.Text(description,
+                style: const pw.TextStyle(
+                    fontSize: 9, color: PdfColors.blueGrey700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _statPill(String label, String value, PdfColor color) {
+    return pw.Column(
+      children: [
+        pw.Text(value,
+            style: pw.TextStyle(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+                color: color)),
+        pw.Text(label,
+            style: const pw.TextStyle(
+                fontSize: 8, color: PdfColors.grey600)),
+      ],
+    );
+  }
+
+  static pw.Widget _masterInvTopTable(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return pw.Text('Kalem bulunamadi.',
+          style:
+              const pw.TextStyle(fontSize: 9, color: PdfColors.grey600));
+    }
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: const {
+        0: pw.FixedColumnWidth(22),
+        1: pw.FlexColumnWidth(3),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+        4: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: [
+            _invTh('#'),
+            _invTh('Kalem'),
+            _invTh('Stok'),
+            _invTh('Birim Maliyet'),
+            _invTh('Toplam TL'),
+          ],
+        ),
+        ...items.asMap().entries.map((entry) {
+          final i = entry.key;
+          final item = entry.value;
+          final amount =
+              (item['current_amount'] as num? ?? 0).toDouble();
+          final cost = (item['unit_cost'] as num? ?? 0).toDouble();
+          final total = amount * cost;
+          return pw.TableRow(
+            children: [
+              _invTd('${i + 1}'),
+              _invTd(item['name']?.toString() ?? '-'),
+              _invTd(
+                  '${amount.toStringAsFixed(1)} ${item['unit'] ?? ''}'),
+              _invTd(cost > 0 ? '${cost.toStringAsFixed(2)} TL' : '-'),
+              _invTd(
+                  total > 0 ? '${total.toStringAsFixed(0)} TL' : '-'),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _masterTrendTable(List<Map<String, dynamic>> trend) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(2),
+        1: pw.FlexColumnWidth(2),
+        2: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: [
+            _invTh('Donem'),
+            _invTh('Maliyet (TL)'),
+            _invTh('Degisim'),
+          ],
+        ),
+        ...trend.asMap().entries.map((entry) {
+          final i = entry.key;
+          final item = entry.value;
+          final cost = (item['total_cost'] as num? ??
+                  item['cost'] as num? ??
+                  0)
+              .toDouble();
+          String change = '-';
+          if (i > 0) {
+            final prev = (trend[i - 1]['total_cost'] as num? ??
+                    trend[i - 1]['cost'] as num? ??
+                    0)
+                .toDouble();
+            if (prev > 0) {
+              final pct = ((cost - prev) / prev * 100).toStringAsFixed(1);
+              change = '${cost > prev ? '+' : ''}$pct%';
+            }
+          }
+          return pw.TableRow(
+            children: [
+              _invTd(item['month']?.toString() ??
+                  item['period']?.toString() ??
+                  '-'),
+              _invTd('${cost.toStringAsFixed(0)} TL'),
+              _invTd(change),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _masterCostTable(List<Map<String, dynamic>> items) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: const {
+        0: pw.FixedColumnWidth(22),
+        1: pw.FlexColumnWidth(3),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+        4: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.orange100),
+          children: [
+            _invTh('#'),
+            _invTh('Kalem'),
+            _invTh('Birim'),
+            _invTh('Stok'),
+            _invTh('Toplam'),
+          ],
+        ),
+        ...items.asMap().entries.map((entry) {
+          final i = entry.key;
+          final item = entry.value;
+          final amount =
+              (item['current_amount'] as num? ?? 0).toDouble();
+          final cost = (item['unit_cost'] as num? ?? 0).toDouble();
+          final total = amount * cost;
+          return pw.TableRow(
+            children: [
+              _invTd('${i + 1}'),
+              _invTd(item['name']?.toString() ?? '-'),
+              _invTd('${cost.toStringAsFixed(2)} TL/${item['unit'] ?? ''}'),
+              _invTd(
+                  '${amount.toStringAsFixed(1)} ${item['unit'] ?? ''}'),
+              _invTd('${total.toStringAsFixed(0)} TL'),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _masterCatTable(
+      List<MapEntry<String, double>> cats) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(3),
+        1: pw.FlexColumnWidth(2),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: [_invTh('Kategori'), _invTh('Maliyet (TL)')],
+        ),
+        ...cats.map((entry) => pw.TableRow(
+              children: [
+                _invTd(entry.key),
+                _invTd('${entry.value.toStringAsFixed(0)} TL'),
+              ],
+            )),
+      ],
+    );
+  }
 }

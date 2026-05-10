@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/pdf_report_service.dart';
 import '../theme/app_theme.dart';
 
 class MainDashboardScreen extends StatefulWidget {
@@ -105,6 +108,65 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
         '${days[now.weekday - 1]}';
   }
 
+  Future<void> _generateMasterReport() async {
+    if (_kpiData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('KPI verisi yok — önce sayfayı yenileyin')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Yıllık rapor oluşturuluyor...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final headers = {'Authorization': 'Bearer $token'};
+
+      final results = await Future.wait([
+        http.get(
+            Uri.parse('http://192.168.1.27:4000/api/budget/summary'),
+            headers: headers),
+        http.get(
+            Uri.parse('http://192.168.1.27:4000/api/budget/trend'),
+            headers: headers),
+      ]);
+
+      if (!mounted) return;
+
+      final budgetSummary = results[0].statusCode == 200
+          ? jsonDecode(results[0].body) as Map<String, dynamic>
+          : <String, dynamic>{};
+      final trendData = results[1].statusCode == 200
+          ? jsonDecode(results[1].body) as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      final bytes = await PdfReportService.generateMasterReport(
+        kpiData: _kpiData!,
+        inventoryItems: _inventoryItems,
+        budgetSummary: budgetSummary,
+        trendData: trendData,
+      );
+
+      if (!mounted) return;
+
+      await Printing.sharePdf(
+        bytes: Uint8List.fromList(bytes),
+        filename: 'yillik_yonetim_raporu.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
@@ -130,6 +192,12 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             tooltip: 'Yenile',
             onPressed: _loadAllData,
           ),
+          if (_userRole == 'admin')
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              tooltip: 'Yıllık Toplu Rapor',
+              onPressed: _generateMasterReport,
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Çıkış',
