@@ -167,4 +167,4 @@ node add_inventory_usage.js
 ## 📄 Lisans
 
 © 2026 Bahattin BÖBER — Tüm hakları saklıdır.  
-Ticari kullanım için iletişime geçin: bbober22@posta.pau.edu.tr
+Ticari kullanım için iletişime geçin: boberbahattin@gmail.com
